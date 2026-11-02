@@ -101,8 +101,8 @@ jobs:
       - name: Build-Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: renderer
+          path: out/renderer
           retention-days: 7
 
   # ---------------------------------------------------------------
@@ -124,14 +124,14 @@ jobs:
       - name: Build-Artefakt herunterladen
         uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: renderer
+          path: out/renderer
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: out/renderer
 
       - name: Deployen
         id: deployment
