@@ -192,7 +192,7 @@ function App(): React.JSX.Element {
     } catch (error) {
       console.error('Das aktive Projekt konnte nicht gespeichert werden.', error)
     }
-  }, [activeProjectId, projects])
+  }, [activeProjectId])
 
   const filteredTickets = projectTickets.filter((ticket) => {
     const query = search.trim().toLocaleLowerCase('de')

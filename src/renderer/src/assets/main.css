@@ -1,12 +1,7 @@
-@import './base.css';
+@import "./base.css";
 
 :root {
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #242632;
   background: #f7f8fb;
   font-synthesis: none;
@@ -291,7 +286,7 @@ select:focus-visible {
 
 .project-item:hover .project-menu-trigger,
 .project-item:focus-within .project-menu-trigger,
-.project-menu-trigger[aria-expanded='true'] {
+.project-menu-trigger[aria-expanded="true"] {
   opacity: 1;
 }
 
@@ -679,7 +674,7 @@ select:focus-visible {
   left: 0;
   height: 2px;
   background: #756ce5;
-  content: '';
+  content: "";
 }
 
 .toolbar-actions {
