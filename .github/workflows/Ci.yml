@@ -127,19 +127,7 @@ jobs:
           name: renderer
           path: out/renderer
 
-      - name: Pages-Token prüfen
-        env:
-          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
-        run: |
-          if [ -z "$PAGES_TOKEN" ]; then
-            echo "::error::Repository-Secret PAGES_TOKEN fehlt. Lege ein Fine-grained PAT mit Administration- und Pages-Schreibrechten an."
-            exit 1
-          fi
-
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-          token: ${{ secrets.PAGES_TOKEN }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
