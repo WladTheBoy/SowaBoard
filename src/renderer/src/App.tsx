@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Login from './components/Login'
 
 type TicketStatus = 'todo' | 'in-progress' | 'done'
 type TicketPriority = 'Niedrig' | 'Mittel' | 'Hoch'
@@ -29,6 +30,16 @@ type ProjectDialog =
 const TICKETS_STORAGE_KEY = 'flowboard-tickets'
 const PROJECTS_STORAGE_KEY = 'flowboard-projects'
 const ACTIVE_PROJECT_STORAGE_KEY = 'flowboard-active-project'
+
+interface Profile {
+  id: string
+  username: string
+}
+
+interface AuthState {
+  profile: Profile | null
+  hasProfiles: boolean
+}
 
 const initialProjects: Project[] = [
   { id: 'website-relaunch', name: 'Website Relaunch', color: 'violet' },
@@ -110,9 +121,9 @@ function isProject(value: unknown): value is Project {
   )
 }
 
-function getSavedProjects(): Project[] {
+function getSavedProjects(profileId: string): Project[] {
   try {
-    const saved = window.localStorage.getItem(PROJECTS_STORAGE_KEY)
+    const saved = window.localStorage.getItem(`${PROJECTS_STORAGE_KEY}:${profileId}`)
     if (!saved) return initialProjects
     const parsed: unknown = JSON.parse(saved)
     if (Array.isArray(parsed) && parsed.every(isProject) && parsed.length > 0) return parsed
@@ -123,9 +134,9 @@ function getSavedProjects(): Project[] {
   return initialProjects
 }
 
-function getSavedTickets(): Ticket[] {
+function getSavedTickets(profileId: string): Ticket[] {
   try {
-    const saved = window.localStorage.getItem(TICKETS_STORAGE_KEY)
+    const saved = window.localStorage.getItem(`${TICKETS_STORAGE_KEY}:${profileId}`)
     if (!saved) return initialTickets
     const parsed: unknown = JSON.parse(saved)
     if (Array.isArray(parsed) && parsed.every(isTicket)) {
@@ -141,18 +152,41 @@ function getSavedTickets(): Ticket[] {
   return initialTickets
 }
 
-function App(): React.JSX.Element {
-  const [projects, setProjects] = useState<Project[]>(getSavedProjects)
+function migrateLegacyData(profileId: string): void {
+  try {
+    for (const key of [PROJECTS_STORAGE_KEY, TICKETS_STORAGE_KEY, ACTIVE_PROJECT_STORAGE_KEY]) {
+      const saved = window.localStorage.getItem(key)
+      const profileKey = `${key}:${profileId}`
+      if (saved !== null && window.localStorage.getItem(profileKey) === null) {
+        window.localStorage.setItem(profileKey, saved)
+        window.localStorage.removeItem(key)
+      }
+    }
+  } catch (error) {
+    console.error('Bisherige Board-Daten konnten nicht dem ersten Profil zugeordnet werden.', error)
+  }
+}
+
+function Board({
+  profile,
+  onLogout
+}: {
+  profile: Profile
+  onLogout: () => void
+}): React.JSX.Element {
+  const [projects, setProjects] = useState<Project[]>(() => getSavedProjects(profile.id))
   const [activeProjectId, setActiveProjectId] = useState(() => {
     try {
-      const savedProjectId = window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY)
+      const savedProjectId = window.localStorage.getItem(
+        `${ACTIVE_PROJECT_STORAGE_KEY}:${profile.id}`
+      )
       return projects.find((project) => project.id === savedProjectId)?.id ?? projects[0].id
     } catch (error) {
       console.error('Das aktive Projekt konnte nicht geladen werden.', error)
       return projects[0].id
     }
   })
-  const [tickets, setTickets] = useState<Ticket[]>(getSavedTickets)
+  const [tickets, setTickets] = useState<Ticket[]>(() => getSavedTickets(profile.id))
   const [projectDialog, setProjectDialog] = useState<ProjectDialog>(null)
   const [projectName, setProjectName] = useState('')
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null)
@@ -160,7 +194,7 @@ function App(): React.JSX.Element {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [ticketTitle, setTicketTitle] = useState('')
   const [ticketDescription, setTicketDescription] = useState('')
-  const [ticketAssignee, setTicketAssignee] = useState('')
+  const [ticketAssignee, setTicketAssignee] = useState(profile.username)
   const [ticketPriority, setTicketPriority] = useState<TicketPriority>('Mittel')
   const [ticketStatus, setTicketStatus] = useState<TicketStatus>('todo')
   const [ticketLabel, setTicketLabel] = useState('Allgemein')
@@ -172,27 +206,27 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects))
+      window.localStorage.setItem(`${PROJECTS_STORAGE_KEY}:${profile.id}`, JSON.stringify(projects))
     } catch (error) {
       console.error('Projekte konnten nicht im lokalen Speicher gesichert werden.', error)
     }
-  }, [projects])
+  }, [projects, profile.id])
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(TICKETS_STORAGE_KEY, JSON.stringify(tickets))
+      window.localStorage.setItem(`${TICKETS_STORAGE_KEY}:${profile.id}`, JSON.stringify(tickets))
     } catch (error) {
       console.error('Tickets konnten nicht im lokalen Speicher gesichert werden.', error)
     }
-  }, [tickets])
+  }, [tickets, profile.id])
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, activeProjectId)
+      window.localStorage.setItem(`${ACTIVE_PROJECT_STORAGE_KEY}:${profile.id}`, activeProjectId)
     } catch (error) {
       console.error('Das aktive Projekt konnte nicht gespeichert werden.', error)
     }
-  }, [activeProjectId])
+  }, [activeProjectId, profile.id])
 
   const filteredTickets = projectTickets.filter((ticket) => {
     const query = search.trim().toLocaleLowerCase('de')
@@ -216,7 +250,7 @@ function App(): React.JSX.Element {
       title,
       description: ticketDescription.trim(),
       priority: ticketPriority,
-      assignee: ticketAssignee.trim() || 'Nicht zugewiesen',
+      assignee: ticketAssignee.trim() || profile.username,
       status: ticketStatus,
       label: ticketLabel.trim() || 'Allgemein'
     }
@@ -224,7 +258,7 @@ function App(): React.JSX.Element {
     setTickets((current) => [ticket, ...current])
     setTicketTitle('')
     setTicketDescription('')
-    setTicketAssignee('')
+    setTicketAssignee(profile.username)
     setTicketPriority('Mittel')
     setTicketStatus('todo')
     setTicketLabel('Allgemein')
@@ -306,16 +340,10 @@ function App(): React.JSX.Element {
         </a>
 
         <nav className="main-nav" aria-label="Hauptnavigation">
-          <span className="nav-heading">MENÜ</span>
-          <a className="nav-link" href="#board">
-            <span className="nav-icon">◫</span> Übersicht
-          </a>
+          <span className="nav-heading">ARBEITSBEREICH</span>
           <a className="nav-link active" href="#board">
-            <span className="nav-icon">▦</span> Kanban Board
+            <span className="nav-icon">▦</span> Board
             <span className="nav-count">{projectTickets.length}</span>
-          </a>
-          <a className="nav-link" href="#board">
-            <span className="nav-icon">⌑</span> Meine Aufgaben
           </a>
         </nav>
 
@@ -393,13 +421,13 @@ function App(): React.JSX.Element {
         </div>
 
         <div className="sidebar-bottom">
-          <div className="user-avatar">JD</div>
+          <div className="user-avatar">{profile.username.slice(0, 2).toUpperCase()}</div>
           <div className="user-details">
-            <strong>Julia Demo</strong>
-            <span>Projektmanagerin</span>
+            <strong>{profile.username}</strong>
+            <span>Angemeldetes Profil</span>
           </div>
-          <button className="icon-button user-menu" aria-label="Profilmenü">
-            ···
+          <button className="icon-button user-menu" aria-label="Abmelden" onClick={onLogout}>
+            ⇥
           </button>
         </div>
       </aside>
@@ -407,18 +435,14 @@ function App(): React.JSX.Element {
       <section className="main-area" id="board">
         <header className="topbar">
           <div className="breadcrumbs">
-            <span>Projekte</span>
+            <span>Board</span>
             <span className="breadcrumb-divider">/</span>
             <strong>{activeProject.name}</strong>
           </div>
           <div className="topbar-actions">
-            <span className="save-status">
-              <span /> Alle Änderungen gespeichert
-            </span>
-            <button className="icon-button notification-button" aria-label="Benachrichtigungen">
-              ♧<i />
-            </button>
-            <div className="user-avatar top-avatar">JD</div>
+            <div className="user-avatar top-avatar" title={profile.username}>
+              {profile.username.slice(0, 2).toUpperCase()}
+            </div>
           </div>
         </header>
 
@@ -432,17 +456,9 @@ function App(): React.JSX.Element {
                   <span>♢</span> Privat
                 </span>
               </div>
-              <p>Aufgaben, Fortschritt und Updates für dein Team.</p>
+              <p>Aufgaben und Fortschritt in deinem persönlichen Board.</p>
             </div>
             <div className="project-header-actions">
-              <div className="avatar-stack" aria-label="3 Teammitglieder">
-                <span className="mini-avatar avatar-lilac">JD</span>
-                <span className="mini-avatar avatar-peach">MK</span>
-                <span className="mini-avatar avatar-mint">AS</span>
-                <button className="add-person" aria-label="Teammitglied hinzufügen">
-                  +
-                </button>
-              </div>
               <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
                 <span>+</span> Ticket erstellen
               </button>
@@ -450,14 +466,6 @@ function App(): React.JSX.Element {
           </section>
 
           <section className="board-toolbar" aria-label="Board-Werkzeuge">
-            <div className="view-tabs">
-              <button className="view-tab active">
-                <span>▦</span> Board
-              </button>
-              <button className="view-tab">
-                <span>☷</span> Liste
-              </button>
-            </div>
             <div className="toolbar-actions">
               <label className="search-box">
                 <span aria-hidden="true">⌕</span>
@@ -468,14 +476,7 @@ function App(): React.JSX.Element {
                   onChange={(event) => setSearch(event.target.value)}
                   aria-label="Tickets suchen"
                 />
-                <kbd>⌘ K</kbd>
               </label>
-              <button className="filter-button">
-                <span>☷</span> Filter
-              </button>
-              <button className="sort-button" aria-label="Sortieren">
-                ↕
-              </button>
             </div>
           </section>
 
@@ -813,6 +814,66 @@ function App(): React.JSX.Element {
       )}
     </main>
   )
+}
+
+function App(): React.JSX.Element {
+  const [authState, setAuthState] = useState<AuthState | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    window.api.auth
+      .getState()
+      .then((state) => {
+        if (isMounted) setAuthState(state)
+      })
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setAuthError(
+            error instanceof Error ? error.message : 'Profile konnten nicht geladen werden.'
+          )
+          setAuthState({ profile: null, hasProfiles: true })
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (isLoading) {
+    return <main className="login-screen"><p className="login-loading">SowaBoard wird geladen...</p></main>
+  }
+
+  if (!authState?.profile) {
+    return (
+      <Login
+        hasProfiles={authState?.hasProfiles ?? false}
+        initialError={authError}
+        onAuthenticated={(profile) => {
+          if (!authState?.hasProfiles) migrateLegacyData(profile.id)
+          setAuthError('')
+          setAuthState({ profile, hasProfiles: true })
+        }}
+      />
+    )
+  }
+
+  const logout = async (): Promise<void> => {
+    try {
+      await window.api.auth.logout()
+      setAuthError('')
+      setAuthState({ profile: null, hasProfiles: true })
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Abmelden ist fehlgeschlagen.')
+      window.alert(`Abmelden ist fehlgeschlagen: ${error instanceof Error ? error.message : error}`)
+    }
+  }
+
+  return <Board profile={authState.profile} onLogout={() => void logout()} />
 }
 
 export default App

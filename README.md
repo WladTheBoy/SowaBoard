@@ -33,3 +33,9 @@ $ npm run build:mac
 $ npm run build:linux
 ```
 # SowaBoard
+
+## Profile
+
+On first launch, create a profile with a username (3–32 letters, numbers, dots, underscores, or hyphens) and a password (8–128 characters). Sign out from the profile area to switch users or sign back in. Each profile has its own projects and tickets.
+
+Profiles and board data are stored on this device only; there is no server-based authentication or cross-device sync. Passwords are stored as scrypt hashes.
