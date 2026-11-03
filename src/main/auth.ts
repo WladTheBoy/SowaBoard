@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-import { app } from 'electron'
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { app } from 'electron'
 
 export interface Profile {
   id: string
@@ -63,7 +63,9 @@ async function writeAccounts(accounts: Account[]): Promise<void> {
 function validateCredentials(username: string, password: string): string {
   const normalizedUsername = username.trim().toLocaleLowerCase('de')
   if (!/^[\p{L}\p{N}._-]{3,32}$/u.test(username.trim())) {
-    throw new Error('Der Benutzername muss 3 bis 32 Zeichen haben und darf Buchstaben, Zahlen, Punkt, _ oder - enthalten.')
+    throw new Error(
+      'Der Benutzername muss 3 bis 32 Zeichen haben und darf Buchstaben, Zahlen, Punkt, _ oder - enthalten.'
+    )
   }
   if (password.length < 8 || password.length > 128) {
     throw new Error('Das Passwort muss zwischen 8 und 128 Zeichen lang sein.')

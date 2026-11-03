@@ -45,7 +45,10 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
           <div className="login-intro">
             <span className="login-eyebrow">DEIN PERSÖNLICHER ARBEITSPLATZ</span>
             <h2>Ordnung für deine Arbeit.</h2>
-            <p>Projekte und Aufgaben an einem Ort. Melde dich an und mach dort weiter, wo du aufgehört hast.</p>
+            <p>
+              Projekte und Aufgaben an einem Ort. Melde dich an und mach dort weiter, wo du
+              aufgehört hast.
+            </p>
           </div>
           <div className="login-aside-footer">
             <span className="login-status-mark" />
@@ -95,11 +98,7 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
               </p>
             )}
             <button className="primary-button login-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting
-                ? 'Bitte warten...'
-                : isRegistering
-                  ? 'Profil erstellen'
-                  : 'Anmelden'}
+              {isSubmitting ? 'Bitte warten...' : isRegistering ? 'Profil erstellen' : 'Anmelden'}
             </button>
           </form>
 

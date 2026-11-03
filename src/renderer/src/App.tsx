@@ -450,7 +450,9 @@ function Board({
           <section className="project-header">
             <div className="project-title-area">
               <div className="project-title-row">
-                <span className="project-title-mark">{activeProject.name.charAt(0).toUpperCase()}</span>
+                <span className="project-title-mark">
+                  {activeProject.name.charAt(0).toUpperCase()}
+                </span>
                 <h1>{activeProject.name}</h1>
                 <span className="private-badge">
                   <span>♢</span> Privat
@@ -845,7 +847,11 @@ function App(): React.JSX.Element {
   }, [])
 
   if (isLoading) {
-    return <main className="login-screen"><p className="login-loading">SowaBoard wird geladen...</p></main>
+    return (
+      <main className="login-screen">
+        <p className="login-loading">SowaBoard wird geladen...</p>
+      </main>
+    )
   }
 
   if (!authState?.profile) {
