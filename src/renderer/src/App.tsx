@@ -300,17 +300,10 @@ function App(): React.JSX.Element {
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <a className="app-brand" href="#" aria-label="Flowboard Startseite">
-          <span className="brand-symbol">f</span>
-          <span>flowboard</span>
+        <a className="app-brand" href="#board" aria-label="SowaBoard Startseite">
+          <span className="brand-symbol">S</span>
+          <span>SowaBoard</span>
         </a>
-
-        <div className="workspace-label">WORKSPACE</div>
-        <button className="workspace-switcher">
-          <span className="workspace-avatar">S</span>
-          <span className="workspace-name">Studio Nord</span>
-          <span className="chevron">⌄</span>
-        </button>
 
         <nav className="main-nav" aria-label="Hauptnavigation">
           <span className="nav-heading">MENÜ</span>
@@ -433,13 +426,13 @@ function App(): React.JSX.Element {
           <section className="project-header">
             <div className="project-title-area">
               <div className="project-title-row">
-                <span className="project-title-mark">W</span>
+                <span className="project-title-mark">{activeProject.name.charAt(0).toUpperCase()}</span>
                 <h1>{activeProject.name}</h1>
                 <span className="private-badge">
                   <span>♢</span> Privat
                 </span>
               </div>
-              <p>Alles rund um den neuen Webauftritt an einem Ort.</p>
+              <p>Aufgaben, Fortschritt und Updates für dein Team.</p>
             </div>
             <div className="project-header-actions">
               <div className="avatar-stack" aria-label="3 Teammitglieder">
