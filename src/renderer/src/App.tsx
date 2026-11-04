@@ -1,25 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  api,
+  apiErrorMessage,
+  clearAccessToken,
+  requireApiData,
+  setUnauthorizedHandler,
+  throwOnApiError
+} from './api/client'
+import type { paths } from './api/generated/schema'
 import Login from './components/Login'
 
-type TicketStatus = 'todo' | 'in-progress' | 'done'
-type TicketPriority = 'Niedrig' | 'Mittel' | 'Hoch'
-
-interface Ticket {
-  id: string
-  projectId: string
-  title: string
-  description: string
-  priority: TicketPriority
-  assignee: string
-  status: TicketStatus
-  label: string
-}
-
-interface Project {
-  id: string
-  name: string
-  color: 'violet' | 'orange' | 'cyan'
-}
+type Project = paths['/projects']['get']['responses']['200']['content']['application/json'][number]
+type Ticket = paths['/tickets']['get']['responses']['200']['content']['application/json'][number]
+type User = paths['/users']['get']['responses']['200']['content']['application/json'][number]
+type AuthenticatedUser = paths['/auth/me']['get']['responses']['200']['content']['application/json']
+type TicketStatus = Ticket['status']
+type TicketPriority = Ticket['priority']
 
 type ProjectDialog =
   | { mode: 'create' }
@@ -27,166 +23,26 @@ type ProjectDialog =
   | { mode: 'delete'; projectId: string }
   | null
 
-const TICKETS_STORAGE_KEY = 'flowboard-tickets'
-const PROJECTS_STORAGE_KEY = 'flowboard-projects'
-const ACTIVE_PROJECT_STORAGE_KEY = 'flowboard-active-project'
-
-interface Profile {
-  id: string
-  username: string
-}
-
-interface AuthState {
-  profile: Profile | null
-  hasProfiles: boolean
-}
-
-const initialProjects: Project[] = [
-  { id: 'website-relaunch', name: 'Website Relaunch', color: 'violet' },
-  { id: 'mobile-app', name: 'Mobile App', color: 'orange' },
-  { id: 'marketing-2025', name: 'Marketing 2025', color: 'cyan' }
-]
-
-const initialTickets: Ticket[] = [
-  {
-    id: 'FLW-12',
-    projectId: 'website-relaunch',
-    title: 'Projektstruktur aufsetzen',
-    description: 'Grundgerüst und Ordnerstruktur für das neue Projekt vorbereiten.',
-    priority: 'Hoch',
-    assignee: 'Max',
-    status: 'todo',
-    label: 'Planung'
-  },
-  {
-    id: 'FLW-13',
-    projectId: 'website-relaunch',
-    title: 'Nutzer-Feedback sammeln',
-    description: 'Erste Rückmeldungen aus dem Team zusammentragen.',
-    priority: 'Mittel',
-    assignee: 'Lisa',
-    status: 'todo',
-    label: 'Research'
-  },
-  {
-    id: 'FLW-14',
-    projectId: 'website-relaunch',
-    title: 'Board-Ansicht gestalten',
-    description: 'Karten und Status-Spalten für das Kanban-Board entwerfen.',
-    priority: 'Hoch',
-    assignee: 'Anna',
-    status: 'in-progress',
-    label: 'Design'
-  },
-  {
-    id: 'FLW-15',
-    projectId: 'website-relaunch',
-    title: 'Farben abstimmen',
-    description: 'Farbpalette für die neue Projektoberfläche finalisieren.',
-    priority: 'Niedrig',
-    assignee: 'Max',
-    status: 'done',
-    label: 'Design'
-  }
-]
-
 const columns: { id: TicketStatus; title: string; color: string }[] = [
   { id: 'todo', title: 'Zu erledigen', color: 'slate' },
   { id: 'in-progress', title: 'In Arbeit', color: 'blue' },
   { id: 'done', title: 'Done', color: 'green' }
 ]
 
-function isTicket(value: unknown): value is Ticket {
-  if (!value || typeof value !== 'object') return false
-  const ticket = value as Record<string, unknown>
-  return (
-    typeof ticket.id === 'string' &&
-    (ticket.projectId === undefined || typeof ticket.projectId === 'string') &&
-    typeof ticket.title === 'string' &&
-    typeof ticket.description === 'string' &&
-    (ticket.priority === 'Niedrig' || ticket.priority === 'Mittel' || ticket.priority === 'Hoch') &&
-    typeof ticket.assignee === 'string' &&
-    (ticket.status === 'todo' || ticket.status === 'in-progress' || ticket.status === 'done') &&
-    typeof ticket.label === 'string'
-  )
-}
-
-function isProject(value: unknown): value is Project {
-  if (!value || typeof value !== 'object') return false
-  const project = value as Record<string, unknown>
-  return (
-    typeof project.id === 'string' &&
-    typeof project.name === 'string' &&
-    (project.color === 'violet' || project.color === 'orange' || project.color === 'cyan')
-  )
-}
-
-function getSavedProjects(profileId: string): Project[] {
-  try {
-    const saved = window.localStorage.getItem(`${PROJECTS_STORAGE_KEY}:${profileId}`)
-    if (!saved) return initialProjects
-    const parsed: unknown = JSON.parse(saved)
-    if (Array.isArray(parsed) && parsed.every(isProject) && parsed.length > 0) return parsed
-    console.error('Gespeicherte Projekte haben ein ungültiges Format.')
-  } catch (error) {
-    console.error('Projekte konnten nicht aus dem lokalen Speicher geladen werden.', error)
-  }
-  return initialProjects
-}
-
-function getSavedTickets(profileId: string): Ticket[] {
-  try {
-    const saved = window.localStorage.getItem(`${TICKETS_STORAGE_KEY}:${profileId}`)
-    if (!saved) return initialTickets
-    const parsed: unknown = JSON.parse(saved)
-    if (Array.isArray(parsed) && parsed.every(isTicket)) {
-      return parsed.map((ticket) => ({
-        ...ticket,
-        projectId: ticket.projectId ?? 'website-relaunch'
-      }))
-    }
-    console.error('Gespeicherte Tickets haben ein ungültiges Format.')
-  } catch (error) {
-    console.error('Tickets konnten nicht aus dem lokalen Speicher geladen werden.', error)
-  }
-  return initialTickets
-}
-
-function migrateLegacyData(profileId: string): void {
-  try {
-    for (const key of [PROJECTS_STORAGE_KEY, TICKETS_STORAGE_KEY, ACTIVE_PROJECT_STORAGE_KEY]) {
-      const saved = window.localStorage.getItem(key)
-      const profileKey = `${key}:${profileId}`
-      if (saved !== null && window.localStorage.getItem(profileKey) === null) {
-        window.localStorage.setItem(profileKey, saved)
-        window.localStorage.removeItem(key)
-      }
-    }
-  } catch (error) {
-    console.error('Bisherige Board-Daten konnten nicht dem ersten Profil zugeordnet werden.', error)
-  }
-}
-
 function Board({
-  profile,
+  user,
   onLogout
 }: {
-  profile: Profile
+  user: AuthenticatedUser
   onLogout: () => void
 }): React.JSX.Element {
-  const [projects, setProjects] = useState<Project[]>(() => getSavedProjects(profile.id))
-  const [activeProjectId, setActiveProjectId] = useState(() => {
-    try {
-      const savedProjectId = window.localStorage.getItem(
-        `${ACTIVE_PROJECT_STORAGE_KEY}:${profile.id}`
-      )
-      return projects.find((project) => project.id === savedProjectId)?.id ?? projects[0].id
-    } catch (error) {
-      console.error('Das aktive Projekt konnte nicht geladen werden.', error)
-      return projects[0].id
-    }
-  })
-  const [tickets, setTickets] = useState<Ticket[]>(() => getSavedTickets(profile.id))
+  const [projects, setProjects] = useState<Project[]>([])
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [activeProjectId, setActiveProjectId] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isMutating, setIsMutating] = useState(false)
+  const [apiError, setApiError] = useState('')
   const [projectDialog, setProjectDialog] = useState<ProjectDialog>(null)
   const [projectName, setProjectName] = useState('')
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null)
@@ -194,39 +50,61 @@ function Board({
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [ticketTitle, setTicketTitle] = useState('')
   const [ticketDescription, setTicketDescription] = useState('')
-  const [ticketAssignee, setTicketAssignee] = useState(profile.username)
+  const [ticketAssignee, setTicketAssignee] = useState('')
   const [ticketPriority, setTicketPriority] = useState<TicketPriority>('Mittel')
   const [ticketStatus, setTicketStatus] = useState<TicketStatus>('todo')
   const [ticketLabel, setTicketLabel] = useState('Allgemein')
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null)
   const [dropTargetStatus, setDropTargetStatus] = useState<TicketStatus | null>(null)
 
-  const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0]
-  const projectTickets = tickets.filter((ticket) => ticket.projectId === activeProject.id)
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? null
+  const projectTickets = activeProject
+    ? tickets.filter((ticket) => ticket.projectId === activeProject.id)
+    : []
+
+  const loadBoard = useCallback(async (): Promise<void> => {
+    setIsLoading(true)
+    setApiError('')
+    try {
+      const [projectsResult, ticketsResult, usersResult] = await Promise.all([
+        api.GET('/projects'),
+        api.GET('/tickets'),
+        api.GET('/users')
+      ])
+      const loadedProjects = requireApiData(
+        projectsResult.data,
+        projectsResult.error,
+        'Projekte konnten nicht geladen werden.'
+      )
+      const loadedTickets = requireApiData(
+        ticketsResult.data,
+        ticketsResult.error,
+        'Tickets konnten nicht geladen werden.'
+      )
+      const loadedUsers = requireApiData(
+        usersResult.data,
+        usersResult.error,
+        'Benutzer konnten nicht geladen werden.'
+      ).filter((user) => !user.isDeleted)
+      setProjects(loadedProjects)
+      setTickets(loadedTickets)
+      setUsers(loadedUsers)
+      setActiveProjectId((current) =>
+        loadedProjects.some((project) => project.id === current)
+          ? current
+          : (loadedProjects[0]?.id ?? '')
+      )
+      setTicketAssignee((current) => current || loadedUsers[0]?.username || '')
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Daten konnten nicht vom Backend geladen werden.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(`${PROJECTS_STORAGE_KEY}:${profile.id}`, JSON.stringify(projects))
-    } catch (error) {
-      console.error('Projekte konnten nicht im lokalen Speicher gesichert werden.', error)
-    }
-  }, [projects, profile.id])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(`${TICKETS_STORAGE_KEY}:${profile.id}`, JSON.stringify(tickets))
-    } catch (error) {
-      console.error('Tickets konnten nicht im lokalen Speicher gesichert werden.', error)
-    }
-  }, [tickets, profile.id])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(`${ACTIVE_PROJECT_STORAGE_KEY}:${profile.id}`, activeProjectId)
-    } catch (error) {
-      console.error('Das aktive Projekt konnte nicht gespeichert werden.', error)
-    }
-  }, [activeProjectId, profile.id])
+    void loadBoard()
+  }, [loadBoard])
 
   const filteredTickets = projectTickets.filter((ticket) => {
     const query = search.trim().toLocaleLowerCase('de')
@@ -239,48 +117,80 @@ function Board({
     )
   })
 
-  const createTicket = (event: React.FormEvent<HTMLFormElement>): void => {
+  const createTicket = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     const title = ticketTitle.trim()
-    if (!title) return
+    if (!title || !activeProject) return
 
-    const ticket: Ticket = {
-      id: `FLW-${Date.now().toString().slice(-5)}${tickets.length + 1}`,
-      projectId: activeProject.id,
-      title,
-      description: ticketDescription.trim(),
-      priority: ticketPriority,
-      assignee: ticketAssignee.trim() || profile.username,
-      status: ticketStatus,
-      label: ticketLabel.trim() || 'Allgemein'
+    setApiError('')
+    setIsMutating(true)
+    try {
+      const { data, error } = await api.POST('/tickets', {
+        body: {
+          projectId: activeProject.id,
+          title,
+          description: ticketDescription.trim(),
+          priority: ticketPriority,
+          assignee: ticketAssignee.trim(),
+          status: ticketStatus,
+          label: ticketLabel.trim() || 'Allgemein'
+        }
+      })
+      const ticket = requireApiData(data, error, 'Ticket konnte nicht erstellt werden.')
+      setTickets((current) => [ticket, ...current])
+      setTicketTitle('')
+      setTicketDescription('')
+      setTicketAssignee(users[0]?.username ?? '')
+      setTicketPriority('Mittel')
+      setTicketStatus('todo')
+      setTicketLabel('Allgemein')
+      setIsCreateOpen(false)
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Ticket konnte nicht erstellt werden.'))
+    } finally {
+      setIsMutating(false)
     }
-
-    setTickets((current) => [ticket, ...current])
-    setTicketTitle('')
-    setTicketDescription('')
-    setTicketAssignee(profile.username)
-    setTicketPriority('Mittel')
-    setTicketStatus('todo')
-    setTicketLabel('Allgemein')
-    setIsCreateOpen(false)
   }
 
-  const moveTicket = (ticketId: string, status: TicketStatus): void => {
-    setTickets((current) =>
-      current.map((ticket) => (ticket.id === ticketId ? { ...ticket, status } : ticket))
-    )
+  const moveTicket = async (ticketId: string, status: TicketStatus): Promise<void> => {
+    const ticket = tickets.find((item) => item.id === ticketId)
+    if (!ticket || ticket.status === status) return
+    setApiError('')
+    try {
+      const { data, error } = await api.PATCH('/tickets/{id}', {
+        params: { path: { id: ticketId } },
+        body: { status }
+      })
+      const updatedTicket = requireApiData(
+        data,
+        error,
+        'Ticketstatus konnte nicht geändert werden.'
+      )
+      setTickets((current) => current.map((item) => (item.id === ticketId ? updatedTicket : item)))
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Ticketstatus konnte nicht geändert werden.'))
+    }
   }
 
   const handleTicketDrop = (event: React.DragEvent<HTMLElement>, status: TicketStatus): void => {
     event.preventDefault()
     const ticketId = event.dataTransfer.getData('text/plain') || draggedTicketId
-    if (ticketId) moveTicket(ticketId, status)
+    if (ticketId) void moveTicket(ticketId, status)
     setDraggedTicketId(null)
     setDropTargetStatus(null)
   }
 
-  const deleteTicket = (ticketId: string): void => {
-    setTickets((current) => current.filter((ticket) => ticket.id !== ticketId))
+  const deleteTicket = async (ticketId: string): Promise<void> => {
+    setApiError('')
+    try {
+      const { error } = await api.DELETE('/tickets/{id}', {
+        params: { path: { id: ticketId } }
+      })
+      throwOnApiError(error, 'Ticket konnte nicht gelöscht werden.')
+      setTickets((current) => current.filter((ticket) => ticket.id !== ticketId))
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Ticket konnte nicht gelöscht werden.'))
+    }
   }
 
   const countForStatus = (status: TicketStatus): number =>
@@ -296,39 +206,66 @@ function Board({
     setProjectDialog(dialog)
   }
 
-  const saveProject = (event: React.FormEvent<HTMLFormElement>): void => {
+  const saveProject = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     const name = projectName.trim()
     if (!name || !projectDialog) return
 
-    if (projectDialog.mode === 'create') {
-      const colors: Project['color'][] = ['violet', 'orange', 'cyan']
-      const project: Project = {
-        id: crypto.randomUUID(),
-        name,
-        color: colors[projects.length % colors.length]
+    setApiError('')
+    setIsMutating(true)
+    try {
+      if (projectDialog.mode === 'create') {
+        const colors: Project['color'][] = ['violet', 'orange', 'cyan']
+        const { data, error } = await api.POST('/projects', {
+          body: { name, color: colors[projects.length % colors.length] }
+        })
+        const project = requireApiData(data, error, 'Projekt konnte nicht erstellt werden.')
+        setProjects((current) => [...current, project])
+        setActiveProjectId(project.id)
+      } else if (projectDialog.mode === 'rename') {
+        const { data, error } = await api.PATCH('/projects/{id}', {
+          params: { path: { id: projectDialog.projectId } },
+          body: { name }
+        })
+        const project = requireApiData(data, error, 'Projekt konnte nicht umbenannt werden.')
+        setProjects((current) => current.map((item) => (item.id === project.id ? project : item)))
       }
-      setProjects((current) => [...current, project])
-      setActiveProjectId(project.id)
-    } else if (projectDialog.mode === 'rename') {
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectDialog.projectId ? { ...project, name } : project
-        )
-      )
+      setProjectDialog(null)
+      setProjectName('')
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Projekt konnte nicht gespeichert werden.'))
+    } finally {
+      setIsMutating(false)
     }
-
-    setProjectDialog(null)
-    setProjectName('')
   }
 
-  const deleteProject = (projectId: string): void => {
-    if (projects.length <= 1) return
-    const remainingProjects = projects.filter((project) => project.id !== projectId)
-    setProjects(remainingProjects)
-    setTickets((current) => current.filter((ticket) => ticket.projectId !== projectId))
-    if (activeProjectId === projectId) setActiveProjectId(remainingProjects[0].id)
-    setProjectDialog(null)
+  const deleteProject = async (projectId: string): Promise<void> => {
+    setApiError('')
+    setIsMutating(true)
+    try {
+      const relatedTickets = tickets.filter((ticket) => ticket.projectId === projectId)
+      for (const ticket of relatedTickets) {
+        const { error } = await api.DELETE('/tickets/{id}', {
+          params: { path: { id: ticket.id } }
+        })
+        throwOnApiError(error, `Ticket „${ticket.title}“ konnte nicht gelöscht werden.`)
+        setTickets((current) => current.filter((item) => item.id !== ticket.id))
+      }
+      const { error } = await api.DELETE('/projects/{id}', {
+        params: { path: { id: projectId } }
+      })
+      throwOnApiError(error, 'Projekt konnte nicht gelöscht werden.')
+      const remainingProjects = projects.filter((project) => project.id !== projectId)
+      setProjects(remainingProjects)
+      setActiveProjectId((current) =>
+        current === projectId ? (remainingProjects[0]?.id ?? '') : current
+      )
+      setProjectDialog(null)
+    } catch (error) {
+      setApiError(apiErrorMessage(error, 'Projekt konnte nicht gelöscht werden.'))
+    } finally {
+      setIsMutating(false)
+    }
   }
 
   return (
@@ -403,13 +340,7 @@ function Board({
                     <button
                       className="delete-project-action"
                       role="menuitem"
-                      disabled={projects.length <= 1}
                       onClick={() => openProjectDialog({ mode: 'delete', projectId: project.id })}
-                      title={
-                        projects.length <= 1
-                          ? 'Mindestens ein Projekt muss bestehen bleiben'
-                          : undefined
-                      }
                     >
                       <span>⌫</span> Löschen
                     </button>
@@ -421,12 +352,18 @@ function Board({
         </div>
 
         <div className="sidebar-bottom">
-          <div className="user-avatar">{profile.username.slice(0, 2).toUpperCase()}</div>
+          <div className="user-avatar">{user.username.slice(0, 2).toUpperCase()}</div>
           <div className="user-details">
-            <strong>{profile.username}</strong>
-            <span>Angemeldetes Profil</span>
+            <strong>{user.username}</strong>
+            <span>Angemeldet</span>
           </div>
-          <button className="icon-button user-menu" aria-label="Abmelden" onClick={onLogout}>
+          <button
+            className="icon-button user-menu"
+            aria-label="Abmelden"
+            onClick={onLogout}
+            title="Abmelden"
+            type="button"
+          >
             ⇥
           </button>
         </div>
@@ -437,172 +374,202 @@ function Board({
           <div className="breadcrumbs">
             <span>Board</span>
             <span className="breadcrumb-divider">/</span>
-            <strong>{activeProject.name}</strong>
-          </div>
-          <div className="topbar-actions">
-            <div className="user-avatar top-avatar" title={profile.username}>
-              {profile.username.slice(0, 2).toUpperCase()}
-            </div>
+            <strong>{activeProject?.name ?? 'Kein Projekt ausgewählt'}</strong>
           </div>
         </header>
 
         <div className="board-content">
-          <section className="project-header">
-            <div className="project-title-area">
-              <div className="project-title-row">
-                <span className="project-title-mark">
-                  {activeProject.name.charAt(0).toUpperCase()}
-                </span>
-                <h1>{activeProject.name}</h1>
-                <span className="private-badge">
-                  <span>♢</span> Privat
-                </span>
-              </div>
-              <p>Aufgaben und Fortschritt in deinem persönlichen Board.</p>
-            </div>
-            <div className="project-header-actions">
-              <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
-                <span>+</span> Ticket erstellen
+          {apiError && (
+            <p className="login-error" role="alert">
+              {apiError}{' '}
+              <button type="button" onClick={() => void loadBoard()}>
+                Erneut laden
               </button>
-            </div>
-          </section>
-
-          <section className="board-toolbar" aria-label="Board-Werkzeuge">
-            <div className="toolbar-actions">
-              <label className="search-box">
-                <span aria-hidden="true">⌕</span>
-                <input
-                  type="search"
-                  placeholder="Tickets suchen..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  aria-label="Tickets suchen"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="kanban-board" aria-label="Kanban Board">
-            {columns.map((column) => {
-              const columnTickets = filteredTickets.filter((ticket) => ticket.status === column.id)
-              return (
-                <section
-                  className={`kanban-column${dropTargetStatus === column.id ? ' drag-over' : ''}`}
-                  key={column.id}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    event.dataTransfer.dropEffect = 'move'
-                    setDropTargetStatus(column.id)
-                  }}
-                  onDragLeave={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                      setDropTargetStatus(null)
-                    }
-                  }}
-                  onDrop={(event) => handleTicketDrop(event, column.id)}
+            </p>
+          )}
+          {isLoading ? (
+            <div className="empty-column">Daten werden vom Backend geladen...</div>
+          ) : !activeProject && apiError ? (
+            <div className="empty-column">Backend-Daten konnten nicht geladen werden.</div>
+          ) : !activeProject ? (
+            <section className="project-header">
+              <div className="project-title-area">
+                <h1>Noch keine Projekte</h1>
+                <p>Erstelle ein Projekt, um Tickets im Backend zu verwalten.</p>
+              </div>
+              <div className="project-header-actions">
+                <button
+                  className="primary-button"
+                  onClick={() => openProjectDialog({ mode: 'create' })}
                 >
-                  <div className="column-heading">
-                    <div className="column-title">
-                      <span className={`column-indicator ${column.color}`} />
-                      <h2>{column.title}</h2>
-                      <span className="column-count">{countForStatus(column.id)}</span>
-                    </div>
-                    <button
-                      className="icon-button column-add"
-                      aria-label={`Ticket zu ${column.title} hinzufügen`}
-                      onClick={() => setIsCreateOpen(true)}
-                    >
-                      +
-                    </button>
+                  <span>+</span> Projekt erstellen
+                </button>
+              </div>
+            </section>
+          ) : (
+            <>
+              <section className="project-header">
+                <div className="project-title-area">
+                  <div className="project-title-row">
+                    <span className="project-title-mark">
+                      {activeProject.name.charAt(0).toUpperCase()}
+                    </span>
+                    <h1>{activeProject.name}</h1>
+                    <span className="private-badge">
+                      <span>♢</span> Gemeinsames Board
+                    </span>
                   </div>
+                  <p>Projekte und Aufgaben werden mit dem Backend synchronisiert.</p>
+                </div>
+                <div className="project-header-actions">
+                  <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
+                    <span>+</span> Ticket erstellen
+                  </button>
+                </div>
+              </section>
 
-                  <div className="ticket-list">
-                    {columnTickets.map((ticket) => (
-                      <article
-                        className={`ticket-card${draggedTicketId === ticket.id ? ' dragging' : ''}`}
-                        key={ticket.id}
-                        draggable
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = 'move'
-                          event.dataTransfer.setData('text/plain', ticket.id)
-                          setDraggedTicketId(ticket.id)
-                        }}
-                        onDragEnd={() => {
-                          setDraggedTicketId(null)
+              <section className="board-toolbar" aria-label="Board-Werkzeuge">
+                <div className="toolbar-actions">
+                  <label className="search-box">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      placeholder="Tickets suchen..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      aria-label="Tickets suchen"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="kanban-board" aria-label="Kanban Board">
+                {columns.map((column) => {
+                  const columnTickets = filteredTickets.filter(
+                    (ticket) => ticket.status === column.id
+                  )
+                  return (
+                    <section
+                      className={`kanban-column${dropTargetStatus === column.id ? ' drag-over' : ''}`}
+                      key={column.id}
+                      onDragOver={(event) => {
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = 'move'
+                        setDropTargetStatus(column.id)
+                      }}
+                      onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                           setDropTargetStatus(null)
-                        }}
-                      >
-                        <div className="ticket-topline">
-                          <span className="ticket-id">{ticket.id}</span>
-                          <button
-                            className="icon-button ticket-menu"
-                            onClick={() => deleteTicket(ticket.id)}
-                            aria-label={`Ticket ${ticket.title} löschen`}
-                            title="Ticket löschen"
-                          >
-                            ···
-                          </button>
+                        }
+                      }}
+                      onDrop={(event) => handleTicketDrop(event, column.id)}
+                    >
+                      <div className="column-heading">
+                        <div className="column-title">
+                          <span className={`column-indicator ${column.color}`} />
+                          <h2>{column.title}</h2>
+                          <span className="column-count">{countForStatus(column.id)}</span>
                         </div>
-                        <h3>{ticket.title}</h3>
-                        {ticket.description && (
-                          <p className="ticket-description">{ticket.description}</p>
-                        )}
-                        <div className="ticket-label-row">
-                          <span
-                            className={`ticket-label label-${ticket.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-                          >
-                            <span /> {ticket.label}
-                          </span>
-                          <span className={`priority priority-${ticket.priority.toLowerCase()}`}>
-                            <span>
-                              {ticket.priority === 'Hoch'
-                                ? '↑'
-                                : ticket.priority === 'Niedrig'
-                                  ? '↓'
-                                  : '→'}
-                            </span>
-                            {ticket.priority}
-                          </span>
-                        </div>
-                        <div className="ticket-footer">
-                          <div className="assignee">
-                            <span className="assignee-avatar">
-                              {ticket.assignee.slice(0, 2).toUpperCase()}
-                            </span>
-                            <span>{ticket.assignee}</span>
-                          </div>
-                          <label className="status-select-label">
-                            <span className="sr-only">Status ändern</span>
-                            <select
-                              value={ticket.status}
-                              onChange={(event) =>
-                                moveTicket(ticket.id, event.target.value as TicketStatus)
-                              }
-                              aria-label={`Status von ${ticket.title} ändern`}
-                            >
-                              {columns.map((status) => (
-                                <option key={status.id} value={status.id}>
-                                  {status.title}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      </article>
-                    ))}
-                    {columnTickets.length === 0 && (
-                      <div className="empty-column">
-                        {search ? 'Keine passenden Tickets.' : 'Noch keine Tickets'}
+                        <button
+                          className="icon-button column-add"
+                          aria-label={`Ticket zu ${column.title} hinzufügen`}
+                          onClick={() => setIsCreateOpen(true)}
+                        >
+                          +
+                        </button>
                       </div>
-                    )}
-                    <button className="add-ticket-inline" onClick={() => setIsCreateOpen(true)}>
-                      <span>+</span> Ticket hinzufügen
-                    </button>
-                  </div>
-                </section>
-              )
-            })}
-          </section>
+
+                      <div className="ticket-list">
+                        {columnTickets.map((ticket) => (
+                          <article
+                            className={`ticket-card${draggedTicketId === ticket.id ? ' dragging' : ''}`}
+                            key={ticket.id}
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = 'move'
+                              event.dataTransfer.setData('text/plain', ticket.id)
+                              setDraggedTicketId(ticket.id)
+                            }}
+                            onDragEnd={() => {
+                              setDraggedTicketId(null)
+                              setDropTargetStatus(null)
+                            }}
+                          >
+                            <div className="ticket-topline">
+                              <span className="ticket-id">{ticket.id}</span>
+                              <button
+                                className="icon-button ticket-menu"
+                                onClick={() => void deleteTicket(ticket.id)}
+                                aria-label={`Ticket ${ticket.title} löschen`}
+                                title="Ticket löschen"
+                              >
+                                ···
+                              </button>
+                            </div>
+                            <h3>{ticket.title}</h3>
+                            {ticket.description && (
+                              <p className="ticket-description">{ticket.description}</p>
+                            )}
+                            <div className="ticket-label-row">
+                              <span
+                                className={`ticket-label label-${ticket.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                              >
+                                <span /> {ticket.label}
+                              </span>
+                              <span
+                                className={`priority priority-${ticket.priority.toLowerCase()}`}
+                              >
+                                <span>
+                                  {ticket.priority === 'Hoch'
+                                    ? '↑'
+                                    : ticket.priority === 'Niedrig'
+                                      ? '↓'
+                                      : '→'}
+                                </span>
+                                {ticket.priority}
+                              </span>
+                            </div>
+                            <div className="ticket-footer">
+                              <div className="assignee">
+                                <span className="assignee-avatar">
+                                  {ticket.assignee.slice(0, 2).toUpperCase()}
+                                </span>
+                                <span>{ticket.assignee}</span>
+                              </div>
+                              <label className="status-select-label">
+                                <span className="sr-only">Status ändern</span>
+                                <select
+                                  value={ticket.status}
+                                  onChange={(event) =>
+                                    void moveTicket(ticket.id, event.target.value as TicketStatus)
+                                  }
+                                  aria-label={`Status von ${ticket.title} ändern`}
+                                >
+                                  {columns.map((status) => (
+                                    <option key={status.id} value={status.id}>
+                                      {status.title}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          </article>
+                        ))}
+                        {columnTickets.length === 0 && (
+                          <div className="empty-column">
+                            {search ? 'Keine passenden Tickets.' : 'Noch keine Tickets'}
+                          </div>
+                        )}
+                        <button className="add-ticket-inline" onClick={() => setIsCreateOpen(true)}>
+                          <span>+</span> Ticket hinzufügen
+                        </button>
+                      </div>
+                    </section>
+                  )
+                })}
+              </section>
+            </>
+          )}
         </div>
       </section>
 
@@ -649,7 +616,8 @@ function Board({
                   <button
                     type="button"
                     className="primary-button danger-button"
-                    onClick={() => deleteProject(projectDialog.projectId)}
+                    disabled={isMutating}
+                    onClick={() => void deleteProject(projectDialog.projectId)}
                   >
                     Projekt löschen
                   </button>
@@ -694,7 +662,7 @@ function Board({
                     >
                       Abbrechen
                     </button>
-                    <button type="submit" className="primary-button">
+                    <button type="submit" className="primary-button" disabled={isMutating}>
                       {projectDialog.mode === 'create' ? 'Projekt erstellen' : 'Speichern'}
                     </button>
                   </div>
@@ -720,7 +688,7 @@ function Board({
           >
             <div className="modal-heading">
               <div>
-                <span className="modal-eyebrow">{activeProject.name.toLocaleUpperCase('de')}</span>
+                <span className="modal-eyebrow">{activeProject?.name.toLocaleUpperCase('de')}</span>
                 <h2 id="modal-title">Neues Ticket</h2>
               </div>
               <button
@@ -761,9 +729,16 @@ function Board({
                   <input
                     placeholder="Name"
                     maxLength={40}
+                    list="backend-users"
+                    required
                     value={ticketAssignee}
                     onChange={(event) => setTicketAssignee(event.target.value)}
                   />
+                  <datalist id="backend-users">
+                    {users.map((user) => (
+                      <option key={user.id} value={user.username} />
+                    ))}
+                  </datalist>
                 </label>
                 <label className="form-field">
                   <span>Priorität</span>
@@ -806,7 +781,7 @@ function Board({
                 >
                   Abbrechen
                 </button>
-                <button type="submit" className="primary-button">
+                <button type="submit" className="primary-button" disabled={isMutating}>
                   Ticket erstellen
                 </button>
               </div>
@@ -819,67 +794,24 @@ function Board({
 }
 
 function App(): React.JSX.Element {
-  const [authState, setAuthState] = useState<AuthState | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
+  const [user, setUser] = useState<AuthenticatedUser | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-    window.api.auth
-      .getState()
-      .then((state) => {
-        if (isMounted) setAuthState(state)
-      })
-      .catch((error: unknown) => {
-        if (isMounted) {
-          setAuthError(
-            error instanceof Error ? error.message : 'Profile konnten nicht geladen werden.'
-          )
-          setAuthState({ profile: null, hasProfiles: true })
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false)
-      })
-    return () => {
-      isMounted = false
-    }
+  const handleUnauthorized = useCallback(() => {
+    setUser(null)
   }, [])
 
-  if (isLoading) {
-    return (
-      <main className="login-screen">
-        <p className="login-loading">SowaBoard wird geladen...</p>
-      </main>
-    )
+  useEffect(() => {
+    setUnauthorizedHandler(handleUnauthorized)
+    return () => setUnauthorizedHandler(() => {})
+  }, [handleUnauthorized])
+
+  const logout = (): void => {
+    clearAccessToken()
+    setUser(null)
   }
 
-  if (!authState?.profile) {
-    return (
-      <Login
-        hasProfiles={authState?.hasProfiles ?? false}
-        initialError={authError}
-        onAuthenticated={(profile) => {
-          if (!authState?.hasProfiles) migrateLegacyData(profile.id)
-          setAuthError('')
-          setAuthState({ profile, hasProfiles: true })
-        }}
-      />
-    )
-  }
-
-  const logout = async (): Promise<void> => {
-    try {
-      await window.api.auth.logout()
-      setAuthError('')
-      setAuthState({ profile: null, hasProfiles: true })
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Abmelden ist fehlgeschlagen.')
-      window.alert(`Abmelden ist fehlgeschlagen: ${error instanceof Error ? error.message : error}`)
-    }
-  }
-
-  return <Board profile={authState.profile} onLogout={() => void logout()} />
+  if (!user) return <Login onAuthenticated={setUser} />
+  return <Board key={user.id} user={user} onLogout={logout} />
 }
 
 export default App

@@ -1,0 +1,1296 @@
+openapi: 3.1.0
+info:
+  title: SowaBoard Backend API
+  version: 1.0.0
+  description: API documentation for the SowaBoard backend.
+tags:
+  - name: Health
+    description: Backend and database health checks.
+  - name: Auth
+    description: Registration, login, and JWT account endpoints.
+  - name: Users
+    description: User management endpoints.
+  - name: Projects
+    description: Project management endpoints.
+  - name: Tickets
+    description: Ticket management endpoints.
+  - name: Ticket Statuses
+    description: Available ticket status values.
+  - name: Ticket Priorities
+    description: Available ticket priority values.
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas: {}
+  parameters: {}
+paths:
+  /:
+    get:
+      summary: Backend status
+      description: Confirms that the SowaBoard backend is running.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Backend is running
+          content:
+            text/plain:
+              schema:
+                type: string
+  /health/db:
+    get:
+      summary: Database connection status
+      description: Checks whether the backend can run a query against PostgreSQL.
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Database is connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                  database:
+                    type: string
+                    enum:
+                      - connected
+                required:
+                  - status
+                  - database
+        "503":
+          description: Database is unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - error
+                  database:
+                    type: string
+                    enum:
+                      - unavailable
+                required:
+                  - status
+                  - database
+  /users:
+    post:
+      summary: Create a user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - username
+                - password
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                  isDeleted:
+                    type: boolean
+                required:
+                  - id
+                  - username
+                  - isDeleted
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not create user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      summary: List users
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Users returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    username:
+                      type: string
+                    isDeleted:
+                      type: boolean
+                  required:
+                    - id
+                    - username
+                    - isDeleted
+        "500":
+          description: Could not list users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /users/{id}:
+    get:
+      summary: Get a user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: User returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                  isDeleted:
+                    type: boolean
+                required:
+                  - id
+                  - username
+                  - isDeleted
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not get user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    patch:
+      summary: Update a user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                  isDeleted:
+                    type: boolean
+                required:
+                  - id
+                  - username
+                  - isDeleted
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not update user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      summary: Delete a user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: User deleted
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not delete user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /auth/register:
+    post:
+      summary: Register a user
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - username
+                - password
+      responses:
+        "201":
+          description: User registered and access token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  tokenType:
+                    type: string
+                    enum:
+                      - Bearer
+                  expiresIn:
+                    type: number
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      username:
+                        type: string
+                    required:
+                      - id
+                      - username
+                required:
+                  - accessToken
+                  - tokenType
+                  - expiresIn
+                  - user
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not register user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /auth/login:
+    post:
+      summary: Log in
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+              required:
+                - username
+                - password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  tokenType:
+                    type: string
+                    enum:
+                      - Bearer
+                  expiresIn:
+                    type: number
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      username:
+                        type: string
+                    required:
+                      - id
+                      - username
+                required:
+                  - accessToken
+                  - tokenType
+                  - expiresIn
+                  - user
+        "401":
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not log in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /auth/me:
+    get:
+      summary: Get the authenticated user
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Authenticated user returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  username:
+                    type: string
+                required:
+                  - id
+                  - username
+        "401":
+          description: Missing, expired, or invalid JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "503":
+          description: Authentication unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /projects:
+    post:
+      summary: Create a project
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                color:
+                  type: string
+                  enum:
+                    - violet
+                    - orange
+                    - cyan
+              required:
+                - name
+                - color
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  color:
+                    type: string
+                    enum:
+                      - violet
+                      - orange
+                      - cyan
+                required:
+                  - id
+                  - name
+                  - color
+        "500":
+          description: Could not create project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      summary: List projects
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Projects returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    color:
+                      type: string
+                      enum:
+                        - violet
+                        - orange
+                        - cyan
+                  required:
+                    - id
+                    - name
+                    - color
+        "500":
+          description: Could not list projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /projects/{id}:
+    get:
+      summary: Get a project
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Project returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  color:
+                    type: string
+                    enum:
+                      - violet
+                      - orange
+                      - cyan
+                required:
+                  - id
+                  - name
+                  - color
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not get project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    patch:
+      summary: Update a project
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                color:
+                  type: string
+                  enum:
+                    - violet
+                    - orange
+                    - cyan
+      responses:
+        "200":
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  color:
+                    type: string
+                    enum:
+                      - violet
+                      - orange
+                      - cyan
+                required:
+                  - id
+                  - name
+                  - color
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not update project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      summary: Delete a project
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Project deleted
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "409":
+          description: Project still has tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not delete project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /ticket-statuses:
+    get:
+      summary: List ticket statuses
+      tags:
+        - Ticket Statuses
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Available ticket statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - todo
+                    - in-progress
+                    - done
+        "500":
+          description: Could not list ticket statuses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /ticket-priorities:
+    get:
+      summary: List ticket priorities
+      tags:
+        - Ticket Priorities
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Available ticket priorities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - Niedrig
+                    - Mittel
+                    - Hoch
+        "500":
+          description: Could not list ticket priorities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /tickets:
+    post:
+      summary: Create a ticket
+      tags:
+        - Tickets
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum:
+                    - Niedrig
+                    - Mittel
+                    - Hoch
+                assignee:
+                  type: string
+                  minLength: 1
+                status:
+                  type: string
+                  enum:
+                    - todo
+                    - in-progress
+                    - done
+                label:
+                  type: string
+                  minLength: 1
+              required:
+                - projectId
+                - title
+                - description
+                - priority
+                - assignee
+                - status
+                - label
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  priority:
+                    type: string
+                    enum:
+                      - Niedrig
+                      - Mittel
+                      - Hoch
+                  assignee:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - todo
+                      - in-progress
+                      - done
+                  label:
+                    type: string
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - description
+                  - priority
+                  - assignee
+                  - status
+                  - label
+        "500":
+          description: Could not create ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      summary: List tickets
+      tags:
+        - Tickets
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Tickets returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    projectId:
+                      type: string
+                      format: uuid
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    priority:
+                      type: string
+                      enum:
+                        - Niedrig
+                        - Mittel
+                        - Hoch
+                    assignee:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                        - todo
+                        - in-progress
+                        - done
+                    label:
+                      type: string
+                  required:
+                    - id
+                    - projectId
+                    - title
+                    - description
+                    - priority
+                    - assignee
+                    - status
+                    - label
+        "500":
+          description: Could not list tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /tickets/{id}:
+    get:
+      summary: Get a ticket
+      tags:
+        - Tickets
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Ticket returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  priority:
+                    type: string
+                    enum:
+                      - Niedrig
+                      - Mittel
+                      - Hoch
+                  assignee:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - todo
+                      - in-progress
+                      - done
+                  label:
+                    type: string
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - description
+                  - priority
+                  - assignee
+                  - status
+                  - label
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not get ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    patch:
+      summary: Update a ticket
+      tags:
+        - Tickets
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum:
+                    - Niedrig
+                    - Mittel
+                    - Hoch
+                assignee:
+                  type: string
+                  minLength: 1
+                status:
+                  type: string
+                  enum:
+                    - todo
+                    - in-progress
+                    - done
+                label:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  priority:
+                    type: string
+                    enum:
+                      - Niedrig
+                      - Mittel
+                      - Hoch
+                  assignee:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - todo
+                      - in-progress
+                      - done
+                  label:
+                    type: string
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - description
+                  - priority
+                  - assignee
+                  - status
+                  - label
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not update ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      summary: Delete a ticket
+      tags:
+        - Tickets
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Ticket deleted
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not delete ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+webhooks: {}

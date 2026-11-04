@@ -1,34 +1,36 @@
 import { useState } from 'react'
+import { api, apiErrorMessage, requireApiData, setAccessToken } from '../api/client'
 
-interface Profile {
+type AuthenticatedUser = {
   id: string
   username: string
 }
 
 interface LoginProps {
-  hasProfiles: boolean
-  initialError?: string
-  onAuthenticated: (profile: Profile) => void
+  onAuthenticated: (user: AuthenticatedUser) => void
 }
 
-function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): React.JSX.Element {
-  const [isRegistering, setIsRegistering] = useState(!hasProfiles)
+function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
+  const [isRegistering, setIsRegistering] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(initialError ?? '')
+  const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const submit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     setError('')
     setIsSubmitting(true)
+
     try {
-      const profile = isRegistering
-        ? await window.api.auth.register(username, password)
-        : await window.api.auth.login(username, password)
-      onAuthenticated(profile)
+      const result = isRegistering
+        ? await api.POST('/auth/register', { body: { username: username.trim(), password } })
+        : await api.POST('/auth/login', { body: { username: username.trim(), password } })
+      const session = requireApiData(result.data, result.error, 'Die Anmeldung ist fehlgeschlagen.')
+      setAccessToken(session.accessToken, session.expiresIn)
+      onAuthenticated(session.user)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Die Anmeldung ist fehlgeschlagen.')
+      setError(apiErrorMessage(reason, 'Die Anmeldung ist fehlgeschlagen.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -43,26 +45,25 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
             <span>SowaBoard</span>
           </a>
           <div className="login-intro">
-            <span className="login-eyebrow">DEIN PERSÖNLICHER ARBEITSPLATZ</span>
+            <span className="login-eyebrow">DEIN GEMEINSAMER ARBEITSPLATZ</span>
             <h2>Ordnung für deine Arbeit.</h2>
-            <p>
-              Projekte und Aufgaben an einem Ort. Melde dich an und mach dort weiter, wo du
-              aufgehört hast.
-            </p>
+            <p>Projekte und Aufgaben an einem Ort. Melde dich an, um dein Board zu öffnen.</p>
           </div>
           <div className="login-aside-footer">
             <span className="login-status-mark" />
-            <span>Dein Board bleibt auf diesem Gerät.</span>
+            <span>Sichere Anmeldung mit deinem Konto.</span>
           </div>
         </aside>
 
         <section className="login-card" aria-labelledby="login-title">
-          <span className="login-eyebrow">{isRegistering ? 'NEUES PROFIL' : 'ANMELDUNG'}</span>
-          <h1 id="login-title">{isRegistering ? 'Profil erstellen' : 'Willkommen zurück'}</h1>
+          <span className="login-eyebrow">
+            {isRegistering ? 'NEUES KONTO' : 'WILLKOMMEN ZURÜCK'}
+          </span>
+          <h1 id="login-title">{isRegistering ? 'Konto erstellen' : 'Anmelden'}</h1>
           <p className="login-description">
             {isRegistering
-              ? 'Wähle deine Zugangsdaten für SowaBoard.'
-              : 'Melde dich mit deinem Profil an.'}
+              ? 'Erstelle ein Konto, um SowaBoard zu nutzen.'
+              : 'Melde dich mit deinem Backend-Konto an.'}
           </p>
 
           <form className="login-form" onSubmit={submit}>
@@ -70,9 +71,8 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
               <span>Benutzername</span>
               <input
                 autoComplete="username"
-                maxLength={32}
+                maxLength={50}
                 minLength={3}
-                pattern={'[\\p{L}\\p{N}._\\-]{3,32}'}
                 placeholder="Dein Benutzername"
                 required
                 value={username}
@@ -84,8 +84,8 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
               <input
                 autoComplete={isRegistering ? 'new-password' : 'current-password'}
                 maxLength={128}
-                minLength={8}
-                placeholder="Mindestens 8 Zeichen"
+                minLength={isRegistering ? 8 : undefined}
+                placeholder={isRegistering ? 'Mindestens 8 Zeichen' : 'Dein Passwort'}
                 required
                 type="password"
                 value={password}
@@ -98,12 +98,12 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
               </p>
             )}
             <button className="primary-button login-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Bitte warten...' : isRegistering ? 'Profil erstellen' : 'Anmelden'}
+              {isSubmitting ? 'Bitte warten...' : isRegistering ? 'Konto erstellen' : 'Anmelden'}
             </button>
           </form>
 
           <p className="login-switch">
-            {isRegistering ? 'Du hast schon ein Profil?' : 'Noch kein Profil?'}{' '}
+            {isRegistering ? 'Du hast schon ein Konto?' : 'Noch kein Konto?'}{' '}
             <button
               type="button"
               onClick={() => {
@@ -111,10 +111,10 @@ function Login({ hasProfiles, initialError, onAuthenticated }: LoginProps): Reac
                 setIsRegistering((current) => !current)
               }}
             >
-              {isRegistering ? 'Jetzt anmelden' : 'Profil erstellen'}
+              {isRegistering ? 'Jetzt anmelden' : 'Konto erstellen'}
             </button>
           </p>
-          <p className="login-note">Lokale Anmeldung · keine Cloud erforderlich</p>
+          <p className="login-note">JWT-Zugang wird nur während dieser App-Sitzung gehalten.</p>
         </section>
       </div>
     </main>

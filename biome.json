@@ -13,6 +13,7 @@
       "!**/out",
       "!LICENSE.md",
       "!pnpm-lock.yaml",
+      "!src/renderer/src/api/generated/**",
       "!tsconfig.json",
       "!tsconfig.*.json"
     ]

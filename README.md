@@ -34,8 +34,18 @@ $ npm run build:linux
 ```
 # SowaBoard
 
-## Profile
+## OpenAPI
 
-On first launch, create a profile with a username (3–32 letters, numbers, dots, underscores, or hyphens) and a password (8–128 characters). Sign out from the profile area to switch users or sign back in. Each profile has its own projects and tickets.
+The backend API contract is in `openapi/openapi.yaml`. Generate its TypeScript types with:
 
-Profiles and board data are stored on this device only; there is no server-based authentication or cross-device sync. Passwords are stored as scrypt hashes.
+```bash
+bun run api:generate
+```
+
+The generated types are written to `src/renderer/src/api/generated/schema.d.ts`. Do not edit that file directly; update the OpenAPI document and regenerate instead.
+
+## Backend
+
+The renderer loads users, projects, and tickets from the backend and sends all board changes through the typed API client in `src/renderer/src/api/client.ts`. The base URL defaults to `http://localhost:3000`; override it with `VITE_API_BASE_URL` when running or building for another environment.
+
+The app signs in and registers through the backend's `/auth/login` and `/auth/register` endpoints. The access token is kept in memory, sent as a Bearer token on API requests, and cleared on logout or when it expires/is rejected. You will need to sign in again after restarting the app. User records are loaded from the backend and offered as ticket-assignee suggestions.

@@ -1,8 +1,7 @@
 import { join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import icon from '../../resources/icon.png?asset'
-import { getAuthState, loginProfile, logoutProfile, registerProfile } from './auth'
 
 function createWindow(): void {
   // Create the browser window.
@@ -49,21 +48,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  ipcMain.handle('auth:get-state', () => getAuthState())
-  ipcMain.handle('auth:register', (_event, username: unknown, password: unknown) => {
-    if (typeof username !== 'string' || typeof password !== 'string') {
-      throw new Error('Benutzername oder Passwort ist ungültig.')
-    }
-    return registerProfile(username, password)
-  })
-  ipcMain.handle('auth:login', (_event, username: unknown, password: unknown) => {
-    if (typeof username !== 'string' || typeof password !== 'string') {
-      throw new Error('Benutzername oder Passwort ist ungültig.')
-    }
-    return loginProfile(username, password)
-  })
-  ipcMain.handle('auth:logout', () => logoutProfile())
 
   createWindow()
 
