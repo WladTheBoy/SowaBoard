@@ -1062,6 +1062,17 @@ export interface paths {
                         };
                     };
                 };
+                /** @description Project not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: string;
+                        };
+                    };
+                };
                 /** @description Could not create ticket */
                 500: {
                     headers: {
@@ -1242,7 +1253,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Ticket not found */
+                /** @description Ticket or project not found */
                 404: {
                     headers: {
                         [name: string]: unknown;

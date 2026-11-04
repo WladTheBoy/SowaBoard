@@ -2,7 +2,20 @@ import createClient from 'openapi-fetch'
 import type { paths } from './generated/schema'
 
 export const api = createClient<paths>({
-  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+  async fetch(request) {
+    const response = await window.electron.apiRequest({
+      url: request.url,
+      method: request.method,
+      headers: Array.from(request.headers.entries()),
+      body: request.body ? await request.clone().text() : null
+    })
+    return new Response(response.body || null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers
+    })
+  }
 })
 
 let accessToken: string | null = null

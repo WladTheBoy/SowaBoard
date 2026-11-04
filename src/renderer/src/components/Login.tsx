@@ -1,10 +1,6 @@
 import { useState } from 'react'
-import { api, apiErrorMessage, requireApiData, setAccessToken } from '../api/client'
-
-type AuthenticatedUser = {
-  id: string
-  username: string
-}
+import type { AuthenticatedUser } from '../../../shared/auth'
+import { apiErrorMessage, setAccessToken } from '../api/client'
 
 interface LoginProps {
   onAuthenticated: (user: AuthenticatedUser) => void
@@ -23,10 +19,9 @@ function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
     setIsSubmitting(true)
 
     try {
-      const result = isRegistering
-        ? await api.POST('/auth/register', { body: { username: username.trim(), password } })
-        : await api.POST('/auth/login', { body: { username: username.trim(), password } })
-      const session = requireApiData(result.data, result.error, 'Die Anmeldung ist fehlgeschlagen.')
+      const session = isRegistering
+        ? await window.electron.auth.register(username, password)
+        : await window.electron.auth.login(username, password)
       setAccessToken(session.accessToken, session.expiresIn)
       onAuthenticated(session.user)
     } catch (reason) {

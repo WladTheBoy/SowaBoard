@@ -1,7 +1,9 @@
 import { join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import icon from '../../resources/icon.png?asset'
+import { forwardApiRequest } from './api'
+import { login, register } from './auth'
 
 function createWindow(): void {
   // Create the browser window.
@@ -39,7 +41,15 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
+  ipcMain.handle('api:request', (_event, request: unknown) => forwardApiRequest(request))
+  ipcMain.handle('auth:login', (_event, username: unknown, password: unknown) =>
+    login(username, password)
+  )
+  ipcMain.handle('auth:register', (_event, username: unknown, password: unknown) =>
+    register(username, password)
+  )
+
+  // Set app user model id for Windows
   electronApp.setAppUserModelId('com.electron')
 
   // Default open or close DevTools by F12 in development

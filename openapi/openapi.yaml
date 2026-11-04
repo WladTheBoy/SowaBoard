@@ -992,6 +992,17 @@ paths:
                   - assignee
                   - status
                   - label
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "500":
           description: Could not create ticket
           content:
@@ -1234,7 +1245,7 @@ paths:
                   - status
                   - label
         "404":
-          description: Ticket not found
+          description: Ticket or project not found
           content:
             application/json:
               schema:
