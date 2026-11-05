@@ -10,6 +10,8 @@ tags:
     description: Registration, login, and JWT account endpoints.
   - name: Users
     description: User management endpoints.
+  - name: Pages
+    description: Project page and document management endpoints.
   - name: Projects
     description: Project management endpoints.
   - name: Tickets
@@ -555,6 +557,478 @@ paths:
                     type: string
                 required:
                   - error
+  /pages:
+    post:
+      summary: Create a page
+      tags:
+        - Pages
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                  format: uuid
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                content:
+                  type:
+                    - string
+                    - "null"
+                icon:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 100
+                parentId:
+                  type:
+                    - string
+                    - "null"
+                  format: uuid
+                order:
+                  type: integer
+                  default: 0
+              required:
+                - projectId
+      responses:
+        "201":
+          description: Page created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  content:
+                    type:
+                      - string
+                      - "null"
+                  icon:
+                    type:
+                      - string
+                      - "null"
+                  parentId:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  order:
+                    type: integer
+                  createdById:
+                    type: string
+                    format: uuid
+                  updatedById:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - content
+                  - icon
+                  - parentId
+                  - order
+                  - createdById
+                  - updatedById
+                  - createdAt
+                  - updatedAt
+        "404":
+          description: Project or parent page not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not create page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      summary: List pages
+      tags:
+        - Pages
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: projectId
+          in: query
+      responses:
+        "200":
+          description: Pages returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    projectId:
+                      type: string
+                      format: uuid
+                    title:
+                      type: string
+                    content:
+                      type:
+                        - string
+                        - "null"
+                    icon:
+                      type:
+                        - string
+                        - "null"
+                    parentId:
+                      type:
+                        - string
+                        - "null"
+                      format: uuid
+                    order:
+                      type: integer
+                    createdById:
+                      type: string
+                      format: uuid
+                    updatedById:
+                      type:
+                        - string
+                        - "null"
+                      format: uuid
+                    createdAt:
+                      type: string
+                      format: date-time
+                    updatedAt:
+                      type: string
+                      format: date-time
+                  required:
+                    - id
+                    - projectId
+                    - title
+                    - content
+                    - icon
+                    - parentId
+                    - order
+                    - createdById
+                    - updatedById
+                    - createdAt
+                    - updatedAt
+        "500":
+          description: Could not list pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /pages/{id}:
+    get:
+      summary: Get a page
+      tags:
+        - Pages
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Page returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  content:
+                    type:
+                      - string
+                      - "null"
+                  icon:
+                    type:
+                      - string
+                      - "null"
+                  parentId:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  order:
+                    type: integer
+                  createdById:
+                    type: string
+                    format: uuid
+                  updatedById:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - content
+                  - icon
+                  - parentId
+                  - order
+                  - createdById
+                  - updatedById
+                  - createdAt
+                  - updatedAt
+        "404":
+          description: Page not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not get page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    patch:
+      summary: Update a page
+      tags:
+        - Pages
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                content:
+                  type:
+                    - string
+                    - "null"
+                icon:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 100
+                parentId:
+                  type:
+                    - string
+                    - "null"
+                  format: uuid
+                order:
+                  type: integer
+      responses:
+        "200":
+          description: Page updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  projectId:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+                  content:
+                    type:
+                      - string
+                      - "null"
+                  icon:
+                    type:
+                      - string
+                      - "null"
+                  parentId:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  order:
+                    type: integer
+                  createdById:
+                    type: string
+                    format: uuid
+                  updatedById:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - content
+                  - icon
+                  - parentId
+                  - order
+                  - createdById
+                  - updatedById
+                  - createdAt
+                  - updatedAt
+        "400":
+          description: Parent page would create a cycle
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "404":
+          description: Page or parent page not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not update page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      summary: Delete a page
+      tags:
+        - Pages
+      security:
+        - BearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Page deleted
+        "404":
+          description: Page not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "409":
+          description: Page has child pages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Could not delete page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
   /projects:
     post:
       summary: Create a project
@@ -818,7 +1292,7 @@ paths:
                 required:
                   - error
         "409":
-          description: Project still has tickets
+          description: Project still has tickets or pages
           content:
             application/json:
               schema:

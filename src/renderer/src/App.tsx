@@ -9,6 +9,7 @@ import {
 } from './api/client'
 import type { paths } from './api/generated/schema'
 import Login from './components/Login'
+import PageEditor, { type Page } from './components/PageEditor'
 
 type Project = paths['/projects']['get']['responses']['200']['content']['application/json'][number]
 type Ticket = paths['/tickets']['get']['responses']['200']['content']['application/json'][number]
@@ -39,10 +40,15 @@ function Board({
   const [projects, setProjects] = useState<Project[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [pages, setPages] = useState<Page[]>([])
   const [activeProjectId, setActiveProjectId] = useState('')
+  const [selectedPageId, setSelectedPageId] = useState('')
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [apiError, setApiError] = useState('')
+  const [pageError, setPageError] = useState('')
+  const [pagesLoadError, setPagesLoadError] = useState('')
   const [projectDialog, setProjectDialog] = useState<ProjectDialog>(null)
   const [projectName, setProjectName] = useState('')
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null)
@@ -58,6 +64,7 @@ function Board({
   const [dropTargetStatus, setDropTargetStatus] = useState<TicketStatus | null>(null)
 
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null
+  const selectedPage = pages.find((page) => page.id === selectedPageId) ?? null
   const projectTickets = activeProject
     ? tickets.filter((ticket) => ticket.projectId === activeProject.id)
     : []
@@ -66,10 +73,15 @@ function Board({
     setIsLoading(true)
     setApiError('')
     try {
-      const [projectsResult, ticketsResult, usersResult] = await Promise.all([
+      const pagesPromise = api.GET('/pages').then(
+        (result) => ({ status: 'fulfilled' as const, result }),
+        (error: unknown) => ({ status: 'rejected' as const, error })
+      )
+      const [projectsResult, ticketsResult, usersResult, pagesOutcome] = await Promise.all([
         api.GET('/projects'),
         api.GET('/tickets'),
-        api.GET('/users')
+        api.GET('/users'),
+        pagesPromise
       ])
       const loadedProjects = requireApiData(
         projectsResult.data,
@@ -89,6 +101,26 @@ function Board({
       setProjects(loadedProjects)
       setTickets(loadedTickets)
       setUsers(loadedUsers)
+      if (pagesOutcome.status === 'fulfilled') {
+        try {
+          setPages(
+            requireApiData(
+              pagesOutcome.result.data,
+              pagesOutcome.result.error,
+              'Dokumentationsseiten konnten nicht geladen werden.'
+            )
+          )
+          setPagesLoadError('')
+        } catch (error) {
+          setPagesLoadError(
+            apiErrorMessage(error, 'Dokumentationsseiten konnten nicht geladen werden.')
+          )
+        }
+      } else {
+        setPagesLoadError(
+          apiErrorMessage(pagesOutcome.error, 'Dokumentationsseiten konnten nicht geladen werden.')
+        )
+      }
       setActiveProjectId((current) =>
         loadedProjects.some((project) => project.id === current)
           ? current
@@ -243,6 +275,14 @@ function Board({
     setApiError('')
     setIsMutating(true)
     try {
+      if (pagesLoadError) {
+        throw new Error(
+          'Dokumentationsseiten konnten nicht geprüft werden. Lade die Daten erneut, bevor du das Projekt löschst.'
+        )
+      }
+      if (pages.some((page) => page.projectId === projectId)) {
+        throw new Error('Lösche zuerst die Dokumentationsseiten dieses Projekts.')
+      }
       const relatedTickets = tickets.filter((ticket) => ticket.projectId === projectId)
       for (const ticket of relatedTickets) {
         const { error } = await api.DELETE('/tickets/{id}', {
@@ -268,6 +308,100 @@ function Board({
     }
   }
 
+  const toggleProjectPages = (projectId: string): void => {
+    setExpandedProjectIds((current) => {
+      const next = new Set(current)
+      if (next.has(projectId)) next.delete(projectId)
+      else next.add(projectId)
+      return next
+    })
+  }
+
+  const createPage = async (projectId: string, parentId: string | null = null): Promise<void> => {
+    setPageError('')
+    try {
+      const siblingCount = pages.filter(
+        (page) => page.projectId === projectId && page.parentId === parentId
+      ).length
+      const { data, error } = await api.POST('/pages', {
+        body: {
+          projectId,
+          title: 'Neue Seite',
+          content: '',
+          parentId,
+          order: siblingCount
+        }
+      })
+      const page = requireApiData(data, error, 'Seite konnte nicht erstellt werden.')
+      setPages((current) => [...current, page])
+      setSelectedPageId(page.id)
+      setActiveProjectId(projectId)
+      setExpandedProjectIds((current) => new Set(current).add(projectId))
+    } catch (error) {
+      setPageError(apiErrorMessage(error, 'Seite konnte nicht erstellt werden.'))
+    }
+  }
+
+  const savePage = useCallback(
+    async (pageId: string, title: string, content: string): Promise<void> => {
+      const { data, error } = await api.PATCH('/pages/{id}', {
+        params: { path: { id: pageId } },
+        body: { title, content }
+      })
+      const page = requireApiData(data, error, 'Seite konnte nicht gespeichert werden.')
+      setPages((current) => current.map((item) => (item.id === page.id ? page : item)))
+    },
+    []
+  )
+
+  const deletePage = async (pageId: string): Promise<void> => {
+    setPageError('')
+    try {
+      const { error } = await api.DELETE('/pages/{id}', {
+        params: { path: { id: pageId } }
+      })
+      throwOnApiError(error, 'Seite konnte nicht gelöscht werden.')
+      setPages((current) => current.filter((page) => page.id !== pageId))
+      setSelectedPageId('')
+    } catch (error) {
+      setPageError(apiErrorMessage(error, 'Seite konnte nicht gelöscht werden.'))
+    }
+  }
+
+  const renderPageTree = (
+    projectId: string,
+    parentId: string | null,
+    depth = 0,
+    ancestors = new Set<string>()
+  ): React.JSX.Element[] => {
+    const children = pages
+      .filter((page) => page.projectId === projectId && page.parentId === parentId)
+      .sort((left, right) => left.order - right.order)
+
+    return children.flatMap((page) => {
+      if (ancestors.has(page.id)) return []
+      const nextAncestors = new Set(ancestors).add(page.id)
+      return [
+        <button
+          aria-current={selectedPageId === page.id ? 'page' : undefined}
+          className={`page-nav-link${selectedPageId === page.id ? ' selected' : ''}`}
+          key={page.id}
+          onClick={() => {
+            setActiveProjectId(projectId)
+            setSelectedPageId(page.id)
+            setPageError('')
+          }}
+          style={{ paddingLeft: `${10 + depth * 14}px` }}
+          type="button"
+        >
+          <span aria-hidden="true">{page.icon || '▤'}</span>
+          <span className="page-nav-title">{page.title || 'Unbenannte Seite'}</span>
+        </button>,
+        ...renderPageTree(projectId, page.id, depth + 1, nextAncestors)
+      ]
+    })
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -278,7 +412,14 @@ function Board({
 
         <nav className="main-nav" aria-label="Hauptnavigation">
           <span className="nav-heading">ARBEITSBEREICH</span>
-          <a className="nav-link active" href="#board">
+          <a
+            className={`nav-link${selectedPage ? '' : ' active'}`}
+            href="#board"
+            onClick={(event) => {
+              event.preventDefault()
+              setSelectedPageId('')
+            }}
+          >
             <span className="nav-icon">▦</span> Board
             <span className="nav-count">{projectTickets.length}</span>
           </a>
@@ -298,51 +439,82 @@ function Board({
           </div>
           <div className="project-list">
             {projects.map((project) => (
-              <div
-                className="project-item"
-                key={project.id}
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setOpenProjectMenuId(null)
-                  }
-                }}
-              >
-                <button
-                  className={`project-link${activeProjectId === project.id ? ' selected' : ''}`}
-                  onClick={() => {
-                    setActiveProjectId(project.id)
-                    setOpenProjectMenuId(null)
+              <div className="project-group" key={project.id}>
+                <div
+                  className="project-item"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setOpenProjectMenuId(null)
+                    }
                   }}
-                  aria-current={activeProjectId === project.id ? 'page' : undefined}
                 >
-                  <span className={`project-dot ${project.color}`} />
-                  <span className="project-link-name">{project.name}</span>
-                </button>
-                <button
-                  className="icon-button project-menu-trigger"
-                  aria-label={`Menü für ${project.name}`}
-                  aria-haspopup="menu"
-                  aria-expanded={openProjectMenuId === project.id}
-                  onClick={() =>
-                    setOpenProjectMenuId((current) => (current === project.id ? null : project.id))
-                  }
-                >
-                  ···
-                </button>
-                {openProjectMenuId === project.id && (
-                  <div className="project-context-menu" role="menu">
+                  <button
+                    aria-label={`${expandedProjectIds.has(project.id) ? 'Seiten einklappen für' : 'Seiten aufklappen für'} ${project.name}`}
+                    aria-expanded={expandedProjectIds.has(project.id)}
+                    className="icon-button project-expand"
+                    onClick={() => toggleProjectPages(project.id)}
+                    type="button"
+                  >
+                    {expandedProjectIds.has(project.id) ? '▾' : '▸'}
+                  </button>
+                  <button
+                    className={`project-link${activeProjectId === project.id && !selectedPage ? ' selected' : ''}`}
+                    onClick={() => {
+                      setActiveProjectId(project.id)
+                      setSelectedPageId('')
+                      setOpenProjectMenuId(null)
+                    }}
+                    aria-current={
+                      activeProjectId === project.id && !selectedPage ? 'page' : undefined
+                    }
+                    type="button"
+                  >
+                    <span className={`project-dot ${project.color}`} />
+                    <span className="project-link-name">{project.name}</span>
+                  </button>
+                  <button
+                    className="icon-button project-menu-trigger"
+                    aria-label={`Menü für ${project.name}`}
+                    aria-haspopup="menu"
+                    aria-expanded={openProjectMenuId === project.id}
+                    onClick={() =>
+                      setOpenProjectMenuId((current) =>
+                        current === project.id ? null : project.id
+                      )
+                    }
+                    type="button"
+                  >
+                    ···
+                  </button>
+                  {openProjectMenuId === project.id && (
+                    <div className="project-context-menu" role="menu">
+                      <button
+                        role="menuitem"
+                        onClick={() => openProjectDialog({ mode: 'rename', projectId: project.id })}
+                        type="button"
+                      >
+                        <span>✎</span> Umbenennen
+                      </button>
+                      <button
+                        className="delete-project-action"
+                        role="menuitem"
+                        onClick={() => openProjectDialog({ mode: 'delete', projectId: project.id })}
+                        type="button"
+                      >
+                        <span>⌫</span> Löschen
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {expandedProjectIds.has(project.id) && (
+                  <div className="project-pages">
+                    {renderPageTree(project.id, null)}
                     <button
-                      role="menuitem"
-                      onClick={() => openProjectDialog({ mode: 'rename', projectId: project.id })}
+                      className="page-create-link"
+                      onClick={() => void createPage(project.id)}
+                      type="button"
                     >
-                      <span>✎</span> Umbenennen
-                    </button>
-                    <button
-                      className="delete-project-action"
-                      role="menuitem"
-                      onClick={() => openProjectDialog({ mode: 'delete', projectId: project.id })}
-                    >
-                      <span>⌫</span> Löschen
+                      <span aria-hidden="true">+</span> Neue Seite
                     </button>
                   </div>
                 )}
@@ -374,11 +546,26 @@ function Board({
           <div className="breadcrumbs">
             <span>Board</span>
             <span className="breadcrumb-divider">/</span>
-            <strong>{activeProject?.name ?? 'Kein Projekt ausgewählt'}</strong>
+            <strong>
+              {selectedPage?.title ?? activeProject?.name ?? 'Kein Projekt ausgewählt'}
+            </strong>
           </div>
         </header>
 
         <div className="board-content">
+          {pageError && (
+            <p className="login-error" role="alert">
+              {pageError}
+            </p>
+          )}
+          {pagesLoadError && (
+            <p className="login-error" role="alert">
+              {pagesLoadError}{' '}
+              <button type="button" onClick={() => void loadBoard()}>
+                Erneut laden
+              </button>
+            </p>
+          )}
           {apiError && (
             <p className="login-error" role="alert">
               {apiError}{' '}
@@ -406,6 +593,15 @@ function Board({
                 </button>
               </div>
             </section>
+          ) : selectedPage ? (
+            <PageEditor
+              key={selectedPage.id}
+              onCreateChild={(page) => createPage(page.projectId, page.id)}
+              onDelete={deletePage}
+              onSave={savePage}
+              page={selectedPage}
+              projectName={activeProject.name}
+            />
           ) : (
             <>
               <section className="project-header">
@@ -604,6 +800,8 @@ function Board({
                 <p className="project-delete-message">
                   „{projects.find((project) => project.id === projectDialog.projectId)?.name}“ und
                   alle zugehörigen Tickets werden dauerhaft gelöscht.
+                  {pages.some((page) => page.projectId === projectDialog.projectId) &&
+                    ' Lösche zuerst die Dokumentationsseiten dieses Projekts.'}
                 </p>
                 <div className="modal-actions">
                   <button
