@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import logo from '../assets/logo.svg'
 import type { AuthenticatedUser } from '../../../shared/auth'
 import { apiErrorMessage, setAccessToken } from '../api/client'
 
@@ -36,7 +37,7 @@ function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
       <div className="login-layout">
         <aside className="login-aside">
           <a className="app-brand login-brand" href="#login" aria-label="SowaBoard">
-            <span className="brand-symbol">S</span>
+            <img alt="" className="brand-logo" src={logo} />
             <span>SowaBoard</span>
           </a>
           <div className="login-intro">

@@ -8,6 +8,7 @@ import {
   throwOnApiError
 } from './api/client'
 import type { paths } from './api/generated/schema'
+import logo from './assets/logo.svg'
 import Login from './components/Login'
 import PageEditor, { type Page } from './components/PageEditor'
 
@@ -52,8 +53,10 @@ function Board({
   const [projectDialog, setProjectDialog] = useState<ProjectDialog>(null)
   const [projectName, setProjectName] = useState('')
   const [openProjectMenuId, setOpenProjectMenuId] = useState<string | null>(null)
+  const [openTicketMenuId, setOpenTicketMenuId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingTicketId, setEditingTicketId] = useState<string | null>(null)
   const [ticketTitle, setTicketTitle] = useState('')
   const [ticketDescription, setTicketDescription] = useState('')
   const [ticketAssignee, setTicketAssignee] = useState('')
@@ -157,28 +160,46 @@ function Board({
     setApiError('')
     setIsMutating(true)
     try {
-      const { data, error } = await api.POST('/tickets', {
-        body: {
-          projectId: activeProject.id,
-          title,
-          description: ticketDescription.trim(),
-          priority: ticketPriority,
-          assignee: ticketAssignee.trim(),
-          status: ticketStatus,
-          label: ticketLabel.trim() || 'Allgemein'
-        }
-      })
-      const ticket = requireApiData(data, error, 'Ticket konnte nicht erstellt werden.')
-      setTickets((current) => [ticket, ...current])
+      const body = {
+        projectId: activeProject.id,
+        title,
+        description: ticketDescription.trim(),
+        priority: ticketPriority,
+        assignee: ticketAssignee.trim(),
+        status: ticketStatus,
+        label: ticketLabel.trim() || 'Allgemein'
+      }
+      if (editingTicketId) {
+        const { data, error } = await api.PATCH('/tickets/{id}', {
+          params: { path: { id: editingTicketId } },
+          body
+        })
+        const ticket = requireApiData(data, error, 'Ticket konnte nicht gespeichert werden.')
+        setTickets((current) =>
+          current.map((currentTicket) => (currentTicket.id === ticket.id ? ticket : currentTicket))
+        )
+      } else {
+        const { data, error } = await api.POST('/tickets', { body })
+        const ticket = requireApiData(data, error, 'Ticket konnte nicht erstellt werden.')
+        setTickets((current) => [ticket, ...current])
+      }
       setTicketTitle('')
       setTicketDescription('')
       setTicketAssignee(users[0]?.username ?? '')
       setTicketPriority('Mittel')
       setTicketStatus('todo')
       setTicketLabel('Allgemein')
+      setEditingTicketId(null)
       setIsCreateOpen(false)
     } catch (error) {
-      setApiError(apiErrorMessage(error, 'Ticket konnte nicht erstellt werden.'))
+      setApiError(
+        apiErrorMessage(
+          error,
+          editingTicketId
+            ? 'Ticket konnte nicht gespeichert werden.'
+            : 'Ticket konnte nicht erstellt werden.'
+        )
+      )
     } finally {
       setIsMutating(false)
     }
@@ -213,6 +234,7 @@ function Board({
   }
 
   const deleteTicket = async (ticketId: string): Promise<void> => {
+    setOpenTicketMenuId(null)
     setApiError('')
     try {
       const { error } = await api.DELETE('/tickets/{id}', {
@@ -223,6 +245,34 @@ function Board({
     } catch (error) {
       setApiError(apiErrorMessage(error, 'Ticket konnte nicht gelöscht werden.'))
     }
+  }
+
+  const openTicketEditor = (ticket: Ticket): void => {
+    setOpenTicketMenuId(null)
+    setEditingTicketId(ticket.id)
+    setTicketTitle(ticket.title)
+    setTicketDescription(ticket.description)
+    setTicketAssignee(ticket.assignee)
+    setTicketPriority(ticket.priority)
+    setTicketStatus(ticket.status)
+    setTicketLabel(ticket.label)
+    setIsCreateOpen(true)
+  }
+
+  const openTicketCreator = (): void => {
+    setEditingTicketId(null)
+    setTicketTitle('')
+    setTicketDescription('')
+    setTicketAssignee(users[0]?.username ?? '')
+    setTicketPriority('Mittel')
+    setTicketStatus('todo')
+    setTicketLabel('Allgemein')
+    setIsCreateOpen(true)
+  }
+
+  const closeTicketDialog = (): void => {
+    setIsCreateOpen(false)
+    setEditingTicketId(null)
   }
 
   const countForStatus = (status: TicketStatus): number =>
@@ -406,7 +456,7 @@ function Board({
     <main className="app-shell">
       <aside className="sidebar">
         <a className="app-brand" href="#board" aria-label="SowaBoard Startseite">
-          <span className="brand-symbol">S</span>
+          <img alt="" className="brand-logo" src={logo} />
           <span>SowaBoard</span>
         </a>
 
@@ -441,22 +491,13 @@ function Board({
             {projects.map((project) => (
               <div className="project-group" key={project.id}>
                 <div
-                  className="project-item"
+                  className={`project-item${activeProjectId === project.id ? ' is-active' : ''}${expandedProjectIds.has(project.id) ? ' is-expanded' : ''}`}
                   onBlur={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                       setOpenProjectMenuId(null)
                     }
                   }}
                 >
-                  <button
-                    aria-label={`${expandedProjectIds.has(project.id) ? 'Seiten einklappen für' : 'Seiten aufklappen für'} ${project.name}`}
-                    aria-expanded={expandedProjectIds.has(project.id)}
-                    className="icon-button project-expand"
-                    onClick={() => toggleProjectPages(project.id)}
-                    type="button"
-                  >
-                    {expandedProjectIds.has(project.id) ? '▾' : '▸'}
-                  </button>
                   <button
                     className={`project-link${activeProjectId === project.id && !selectedPage ? ' selected' : ''}`}
                     onClick={() => {
@@ -471,6 +512,16 @@ function Board({
                   >
                     <span className={`project-dot ${project.color}`} />
                     <span className="project-link-name">{project.name}</span>
+                  </button>
+                  <button
+                    aria-label={`${expandedProjectIds.has(project.id) ? 'Dokumentationen einklappen für' : 'Dokumentationen aufklappen für'} ${project.name}`}
+                    aria-expanded={expandedProjectIds.has(project.id)}
+                    className="icon-button project-expand"
+                    onClick={() => toggleProjectPages(project.id)}
+                    title="Dokumentationen ein- oder ausklappen"
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="project-expand-chevron" />
                   </button>
                   <button
                     className="icon-button project-menu-trigger"
@@ -618,7 +669,7 @@ function Board({
                   <p>Projekte und Aufgaben werden mit dem Backend synchronisiert.</p>
                 </div>
                 <div className="project-header-actions">
-                  <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
+                  <button className="primary-button" onClick={openTicketCreator}>
                     <span>+</span> Ticket erstellen
                   </button>
                 </div>
@@ -669,7 +720,7 @@ function Board({
                         <button
                           className="icon-button column-add"
                           aria-label={`Ticket zu ${column.title} hinzufügen`}
-                          onClick={() => setIsCreateOpen(true)}
+                          onClick={openTicketCreator}
                         >
                           +
                         </button>
@@ -691,16 +742,51 @@ function Board({
                               setDropTargetStatus(null)
                             }}
                           >
-                            <div className="ticket-topline">
+                            <div
+                              className="ticket-topline"
+                              onBlur={(event) => {
+                                if (
+                                  !event.currentTarget.contains(event.relatedTarget as Node | null)
+                                ) {
+                                  setOpenTicketMenuId(null)
+                                }
+                              }}
+                            >
                               <span className="ticket-id">{ticket.id}</span>
                               <button
                                 className="icon-button ticket-menu"
-                                onClick={() => void deleteTicket(ticket.id)}
-                                aria-label={`Ticket ${ticket.title} löschen`}
-                                title="Ticket löschen"
+                                onClick={() =>
+                                  setOpenTicketMenuId((current) =>
+                                    current === ticket.id ? null : ticket.id
+                                  )
+                                }
+                                aria-label={`Aktionen für Ticket ${ticket.title}`}
+                                aria-haspopup="menu"
+                                aria-expanded={openTicketMenuId === ticket.id}
+                                title="Ticketaktionen"
+                                type="button"
                               >
                                 ···
                               </button>
+                              {openTicketMenuId === ticket.id && (
+                                <div className="ticket-context-menu" role="menu">
+                                  <button
+                                    role="menuitem"
+                                    onClick={() => openTicketEditor(ticket)}
+                                    type="button"
+                                  >
+                                    <span aria-hidden="true">✎</span> Bearbeiten
+                                  </button>
+                                  <button
+                                    className="delete-ticket-action"
+                                    role="menuitem"
+                                    onClick={() => void deleteTicket(ticket.id)}
+                                    type="button"
+                                  >
+                                    <span aria-hidden="true">⌫</span> Löschen
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <h3>{ticket.title}</h3>
                             {ticket.description && (
@@ -756,7 +842,7 @@ function Board({
                             {search ? 'Keine passenden Tickets.' : 'Noch keine Tickets'}
                           </div>
                         )}
-                        <button className="add-ticket-inline" onClick={() => setIsCreateOpen(true)}>
+                        <button className="add-ticket-inline" onClick={openTicketCreator}>
                           <span>+</span> Ticket hinzufügen
                         </button>
                       </div>
@@ -875,7 +961,7 @@ function Board({
         <div
           className="modal-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setIsCreateOpen(false)
+            if (event.target === event.currentTarget) closeTicketDialog()
           }}
         >
           <section
@@ -887,11 +973,11 @@ function Board({
             <div className="modal-heading">
               <div>
                 <span className="modal-eyebrow">{activeProject?.name.toLocaleUpperCase('de')}</span>
-                <h2 id="modal-title">Neues Ticket</h2>
+                <h2 id="modal-title">{editingTicketId ? 'Ticket bearbeiten' : 'Neues Ticket'}</h2>
               </div>
               <button
                 className="icon-button modal-close"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={closeTicketDialog}
                 aria-label="Dialog schließen"
               >
                 ×
@@ -972,15 +1058,11 @@ function Board({
                 />
               </label>
               <div className="modal-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => setIsCreateOpen(false)}
-                >
+                <button type="button" className="secondary-button" onClick={closeTicketDialog}>
                   Abbrechen
                 </button>
                 <button type="submit" className="primary-button" disabled={isMutating}>
-                  Ticket erstellen
+                  {editingTicketId ? 'Änderungen speichern' : 'Ticket erstellen'}
                 </button>
               </div>
             </form>

@@ -71,18 +71,11 @@ select:focus-visible {
   text-decoration: none;
 }
 
-.brand-symbol {
-  display: grid;
+.brand-logo {
   width: 30px;
   height: 30px;
-  place-items: center;
-  border-radius: 9px;
-  background: #756ce5;
-  box-shadow: 0 4px 9px #756ce533;
-  color: white;
-  font-size: 23px;
-  font-weight: 700;
-  line-height: 1;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .nav-heading {
@@ -1913,11 +1906,6 @@ body {
   font-size: 20px;
 }
 
-.brand-symbol {
-  background: linear-gradient(145deg, #58a6e8, #2879bf);
-  box-shadow: 0 5px 16px rgba(57, 139, 210, 0.32);
-}
-
 .nav-heading {
   color: #858da0;
   font-size: 10px;
@@ -2535,6 +2523,62 @@ body {
   }
 }
 
+.ticket-topline {
+  position: relative;
+}
+
+.ticket-context-menu {
+  position: absolute;
+  z-index: 6;
+  top: 24px;
+  right: 0;
+  width: 142px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  padding: 4px;
+  background: var(--surface-raised);
+  box-shadow: 0 8px 22px rgba(24, 31, 43, 0.18);
+}
+
+.ticket-context-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 31px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticket-context-menu button:hover,
+.ticket-context-menu button:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.ticket-context-menu button > span {
+  width: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.ticket-context-menu .delete-ticket-action,
+.ticket-context-menu .delete-ticket-action > span {
+  color: #bd4d50;
+}
+
+.ticket-context-menu .delete-ticket-action:hover,
+.ticket-context-menu .delete-ticket-action:focus-visible {
+  background: color-mix(in srgb, #bd4d50 12%, var(--surface-raised));
+}
+
 :root {
   color-scheme: light;
   --surface-canvas: #f7f6f1;
@@ -2544,10 +2588,10 @@ body {
   --border-subtle: #dfded4;
   --text-primary: #292e29;
   --text-secondary: #777b70;
-  --accent: #526b55;
-  --accent-hover: #425a45;
-  --accent-soft: #e5e9e1;
-  --accent-text: #344a37;
+  --accent: #3a88e0;
+  --accent-hover: #2e73c4;
+  --accent-soft: #e4effb;
+  --accent-text: #24558a;
   color: var(--text-primary);
   background: var(--surface-canvas);
 }
@@ -2572,12 +2616,6 @@ body {
 .breadcrumbs strong,
 .user-details strong {
   color: var(--text-primary);
-}
-
-.brand-symbol {
-  border-radius: 7px;
-  background: var(--accent);
-  box-shadow: none;
 }
 
 .nav-heading {
@@ -2642,8 +2680,8 @@ body {
 
 .user-avatar,
 .assignee-avatar {
-  background: #dce3d8;
-  color: #455e49;
+  background: #dceafa;
+  color: #285d98;
 }
 
 .board-content {
@@ -2653,7 +2691,7 @@ body {
 .project-title-mark {
   border: 0;
   border-radius: 6px;
-  background: #e4e9df;
+  background: #e4effb;
   color: var(--accent);
 }
 
@@ -2661,6 +2699,83 @@ body {
   border-color: #dfded4;
   border-radius: 4px;
   color: #72766c;
+}
+
+.project-list {
+  gap: 5px;
+}
+
+.project-item {
+  gap: 4px;
+  border: 1px solid transparent;
+  padding: 3px;
+}
+
+.project-item:hover,
+.project-item:focus-within {
+  border-color: var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+.project-item.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.project-item.is-active .project-link {
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+.project-expand {
+  width: 23px;
+  height: 25px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.project-expand:hover,
+.project-item.is-expanded .project-expand {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.project-expand-chevron {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  transform-origin: center;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transition: transform 140ms ease;
+}
+
+.project-expand[aria-expanded="false"] .project-expand-chevron {
+  transform: rotate(-45deg);
+}
+
+.project-pages {
+  margin-left: 18px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 7px 7px 0;
+  padding: 5px 4px;
+  background: color-mix(in srgb, var(--surface-sidebar) 72%, var(--surface-raised));
+}
+
+.page-nav-link,
+.page-create-link {
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 550;
+}
+
+.page-nav-link.selected {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 700;
 }
 
 .primary-button {
@@ -2899,7 +3014,7 @@ body {
   flex-direction: column;
   justify-content: space-between;
   padding: 38px 36px 30px;
-  background: #303d32;
+  background: #213b59;
   color: #f2f0e8;
 }
 
@@ -2910,19 +3025,13 @@ body {
   letter-spacing: -0.4px;
 }
 
-.login-brand .brand-symbol {
-  border: 1px solid rgba(242, 240, 232, 0.24);
-  background: transparent;
-  color: #f2f0e8;
-}
-
 .login-intro {
   max-width: 340px;
   margin: 36px 0;
 }
 
 .login-eyebrow {
-  color: #8fa58e;
+  color: #91bff0;
   font-size: 9px;
   font-weight: 650;
   letter-spacing: 1px;
@@ -2957,7 +3066,7 @@ body {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #94ad8c;
+  background: #75b2f3;
 }
 
 .login-card {
@@ -3009,18 +3118,18 @@ body {
 }
 
 .login-field input:focus {
-  border-color: #718873;
+  border-color: #3a88e0;
 }
 
 .login-submit {
   min-height: 43px;
   border-radius: 5px;
   margin-top: 4px;
-  background: #526b55;
+  background: #3a88e0;
 }
 
 .login-submit:hover {
-  background: #425a45;
+  background: #2e73c4;
 }
 
 .login-error {
