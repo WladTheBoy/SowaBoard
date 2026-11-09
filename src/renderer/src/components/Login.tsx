@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import logo from '../assets/logo.svg'
 import type { AuthenticatedUser } from '../../../shared/auth'
 import { apiErrorMessage, setAccessToken } from '../api/client'
+import logo from '../assets/logo.svg'
 
 interface LoginProps {
   onAuthenticated: (user: AuthenticatedUser) => void
