@@ -1,9 +1,6 @@
 import type { AuthSession } from '../shared/auth'
+import { isRecord } from '../shared/guards'
 import { apiBaseUrl } from './api'
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
 
 async function authenticate(
   endpoint: 'login' | 'register',

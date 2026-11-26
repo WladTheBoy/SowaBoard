@@ -1,3 +1,14 @@
+import {
+  CircleAlert,
+  Eye,
+  EyeOff,
+  FileText,
+  LoaderCircle,
+  Lock,
+  Sparkles,
+  SquareKanban,
+  User
+} from 'lucide-react'
 import { useState } from 'react'
 import type { AuthenticatedUser } from '../../../shared/auth'
 import { apiErrorMessage, setAccessToken } from '../api/client'
@@ -7,10 +18,17 @@ interface LoginProps {
   onAuthenticated: (user: AuthenticatedUser) => void
 }
 
+const features = [
+  { icon: SquareKanban, text: 'Kanban-Board für alle Projekte' },
+  { icon: FileText, text: 'Dokumentation direkt am Projekt' },
+  { icon: Sparkles, text: 'KI-Assistent für Tickets' }
+]
+
 function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
   const [isRegistering, setIsRegistering] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -43,7 +61,16 @@ function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
           <div className="login-intro">
             <span className="login-eyebrow">DEIN GEMEINSAMER ARBEITSPLATZ</span>
             <h2>Ordnung für deine Arbeit.</h2>
-            <p>Projekte und Aufgaben an einem Ort. Melde dich an, um dein Board zu öffnen.</p>
+            <ul className="login-features">
+              {features.map(({ icon: Icon, text }) => (
+                <li key={text}>
+                  <span aria-hidden="true" className="login-feature-icon">
+                    <Icon size={16} />
+                  </span>
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="login-aside-footer">
             <span className="login-status-mark" />
@@ -63,37 +90,63 @@ function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
           </p>
 
           <form className="login-form" onSubmit={submit}>
-            <label className="login-field">
-              <span>Benutzername</span>
-              <input
-                autoComplete="username"
-                maxLength={50}
-                minLength={3}
-                placeholder="Dein Benutzername"
-                required
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-              />
-            </label>
-            <label className="login-field">
-              <span>Passwort</span>
-              <input
-                autoComplete={isRegistering ? 'new-password' : 'current-password'}
-                maxLength={128}
-                minLength={isRegistering ? 8 : undefined}
-                placeholder={isRegistering ? 'Mindestens 8 Zeichen' : 'Dein Passwort'}
-                required
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </label>
+            <div className="login-field">
+              <label htmlFor="login-username">Benutzername</label>
+              <div className="login-input">
+                <User aria-hidden="true" className="login-input-icon" size={16} />
+                <input
+                  autoComplete="username"
+                  id="login-username"
+                  maxLength={50}
+                  minLength={3}
+                  placeholder="Dein Benutzername"
+                  required
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="login-field">
+              <label htmlFor="login-password">Passwort</label>
+              <div className="login-input has-toggle">
+                <Lock aria-hidden="true" className="login-input-icon" size={16} />
+                <input
+                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                  id="login-password"
+                  maxLength={128}
+                  minLength={isRegistering ? 8 : undefined}
+                  placeholder={isRegistering ? 'Mindestens 8 Zeichen' : 'Dein Passwort'}
+                  required
+                  type={isPasswordVisible ? 'text' : 'password'}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button
+                  aria-label={isPasswordVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                  aria-pressed={isPasswordVisible}
+                  className="login-password-toggle"
+                  onClick={() => setIsPasswordVisible((current) => !current)}
+                  title={isPasswordVisible ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                  type="button"
+                >
+                  {isPasswordVisible ? (
+                    <EyeOff aria-hidden="true" size={16} />
+                  ) : (
+                    <Eye aria-hidden="true" size={16} />
+                  )}
+                </button>
+              </div>
+            </div>
             {error && (
               <p className="login-error" role="alert">
-                {error}
+                <CircleAlert aria-hidden="true" size={16} />
+                <span>{error}</span>
               </p>
             )}
             <button className="primary-button login-submit" disabled={isSubmitting} type="submit">
+              {isSubmitting && (
+                <LoaderCircle aria-hidden="true" className="login-spinner" size={16} />
+              )}
               {isSubmitting ? 'Bitte warten...' : isRegistering ? 'Konto erstellen' : 'Anmelden'}
             </button>
           </form>
@@ -110,7 +163,9 @@ function Login({ onAuthenticated }: LoginProps): React.JSX.Element {
               {isRegistering ? 'Jetzt anmelden' : 'Konto erstellen'}
             </button>
           </p>
-          <p className="login-note">JWT-Zugang wird nur während dieser App-Sitzung gehalten.</p>
+          <p className="login-note">
+            Du bleibst angemeldet, bis du die App schließt oder die Sitzung abläuft.
+          </p>
         </section>
       </div>
     </main>

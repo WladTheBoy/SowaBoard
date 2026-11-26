@@ -15,16 +15,8 @@ const api = {
   }
 }
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', api)
-  } catch (error) {
-    console.error('Die App-Schnittstelle konnte nicht bereitgestellt werden.', error)
-  }
-} else {
-  // @ts-expect-error (define in dts)
-  window.electron = api
+try {
+  contextBridge.exposeInMainWorld('electron', api)
+} catch (error) {
+  console.error('Die App-Schnittstelle konnte nicht bereitgestellt werden.', error)
 }

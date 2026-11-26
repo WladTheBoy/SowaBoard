@@ -1,13 +1,10 @@
 import type { ApiResponse } from '../shared/api'
+import { isRecord } from '../shared/guards'
 
 export const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://localhost:3000'
 
 const allowedMethods = new Set(['GET', 'POST', 'PATCH', 'DELETE'])
 const allowedHeaders = new Set(['accept', 'authorization', 'content-type'])
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
 
 export async function forwardApiRequest(input: unknown): Promise<ApiResponse> {
   if (

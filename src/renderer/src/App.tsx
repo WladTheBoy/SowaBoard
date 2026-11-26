@@ -1,3 +1,18 @@
+import {
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Ellipsis,
+  Equal,
+  FileText,
+  LogOut,
+  Pencil,
+  Plus,
+  Search,
+  SquareKanban,
+  Trash2,
+  Users
+} from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
   api,
@@ -30,6 +45,20 @@ const columns: { id: TicketStatus; title: string; color: string }[] = [
   { id: 'in-progress', title: 'In Arbeit', color: 'blue' },
   { id: 'done', title: 'Done', color: 'green' }
 ]
+
+const priorities: TicketPriority[] = ['Niedrig', 'Mittel', 'Hoch']
+
+function isTicketStatus(value: string): value is TicketStatus {
+  return columns.some((column) => column.id === value)
+}
+
+function isTicketPriority(value: string): value is TicketPriority {
+  return priorities.some((priority) => priority === value)
+}
+
+function isOutside(container: Element, target: EventTarget | null): boolean {
+  return !(target instanceof Node && container.contains(target))
+}
 
 function Board({
   user,
@@ -444,7 +473,9 @@ function Board({
           style={{ paddingLeft: `${10 + depth * 14}px` }}
           type="button"
         >
-          <span aria-hidden="true">{page.icon || '▤'}</span>
+          <span aria-hidden="true" className="page-nav-icon">
+            {page.icon || <FileText size={14} />}
+          </span>
           <span className="page-nav-title">{page.title || 'Unbenannte Seite'}</span>
         </button>,
         ...renderPageTree(projectId, page.id, depth + 1, nextAncestors)
@@ -470,7 +501,10 @@ function Board({
               setSelectedPageId('')
             }}
           >
-            <span className="nav-icon">▦</span> Board
+            <span aria-hidden="true" className="nav-icon">
+              <SquareKanban size={16} />
+            </span>
+            Board
             <span className="nav-count">{projectTickets.length}</span>
           </a>
         </nav>
@@ -483,8 +517,9 @@ function Board({
               aria-label="Projekt hinzufügen"
               onClick={() => openProjectDialog({ mode: 'create' })}
               title="Projekt hinzufügen"
+              type="button"
             >
-              +
+              <Plus aria-hidden="true" size={15} />
             </button>
           </div>
           <div className="project-list">
@@ -493,7 +528,7 @@ function Board({
                 <div
                   className={`project-item${activeProjectId === project.id ? ' is-active' : ''}${expandedProjectIds.has(project.id) ? ' is-expanded' : ''}`}
                   onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    if (isOutside(event.currentTarget, event.relatedTarget)) {
                       setOpenProjectMenuId(null)
                     }
                   }}
@@ -521,7 +556,7 @@ function Board({
                     title="Dokumentationen ein- oder ausklappen"
                     type="button"
                   >
-                    <span aria-hidden="true" className="project-expand-chevron" />
+                    <ChevronRight aria-hidden="true" className="project-expand-chevron" size={14} />
                   </button>
                   <button
                     className="icon-button project-menu-trigger"
@@ -535,7 +570,7 @@ function Board({
                     }
                     type="button"
                   >
-                    ···
+                    <Ellipsis aria-hidden="true" size={16} />
                   </button>
                   {openProjectMenuId === project.id && (
                     <div className="project-context-menu" role="menu">
@@ -544,7 +579,7 @@ function Board({
                         onClick={() => openProjectDialog({ mode: 'rename', projectId: project.id })}
                         type="button"
                       >
-                        <span>✎</span> Umbenennen
+                        <Pencil aria-hidden="true" size={14} /> Umbenennen
                       </button>
                       <button
                         className="delete-project-action"
@@ -552,7 +587,7 @@ function Board({
                         onClick={() => openProjectDialog({ mode: 'delete', projectId: project.id })}
                         type="button"
                       >
-                        <span>⌫</span> Löschen
+                        <Trash2 aria-hidden="true" size={14} /> Löschen
                       </button>
                     </div>
                   )}
@@ -565,7 +600,7 @@ function Board({
                       onClick={() => void createPage(project.id)}
                       type="button"
                     >
-                      <span aria-hidden="true">+</span> Neue Seite
+                      <Plus aria-hidden="true" size={14} /> Neue Seite
                     </button>
                   </div>
                 )}
@@ -587,7 +622,7 @@ function Board({
             title="Abmelden"
             type="button"
           >
-            ⇥
+            <LogOut aria-hidden="true" size={16} />
           </button>
         </div>
       </aside>
@@ -639,8 +674,9 @@ function Board({
                 <button
                   className="primary-button"
                   onClick={() => openProjectDialog({ mode: 'create' })}
+                  type="button"
                 >
-                  <span>+</span> Projekt erstellen
+                  <Plus aria-hidden="true" size={16} /> Projekt erstellen
                 </button>
               </div>
             </section>
@@ -663,14 +699,14 @@ function Board({
                     </span>
                     <h1>{activeProject.name}</h1>
                     <span className="private-badge">
-                      <span>♢</span> Gemeinsames Board
+                      <Users aria-hidden="true" size={12} /> Gemeinsames Board
                     </span>
                   </div>
                   <p>Projekte und Aufgaben werden mit dem Backend synchronisiert.</p>
                 </div>
                 <div className="project-header-actions">
-                  <button className="primary-button" onClick={openTicketCreator}>
-                    <span>+</span> Ticket erstellen
+                  <button className="primary-button" onClick={openTicketCreator} type="button">
+                    <Plus aria-hidden="true" size={16} /> Ticket erstellen
                   </button>
                 </div>
               </section>
@@ -678,7 +714,7 @@ function Board({
               <section className="board-toolbar" aria-label="Board-Werkzeuge">
                 <div className="toolbar-actions">
                   <label className="search-box">
-                    <span aria-hidden="true">⌕</span>
+                    <Search aria-hidden="true" size={15} />
                     <input
                       type="search"
                       placeholder="Tickets suchen..."
@@ -705,7 +741,7 @@ function Board({
                         setDropTargetStatus(column.id)
                       }}
                       onDragLeave={(event) => {
-                        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        if (isOutside(event.currentTarget, event.relatedTarget)) {
                           setDropTargetStatus(null)
                         }
                       }}
@@ -721,8 +757,10 @@ function Board({
                           className="icon-button column-add"
                           aria-label={`Ticket zu ${column.title} hinzufügen`}
                           onClick={openTicketCreator}
+                          title="Ticket hinzufügen"
+                          type="button"
                         >
-                          +
+                          <Plus aria-hidden="true" size={16} />
                         </button>
                       </div>
 
@@ -745,14 +783,14 @@ function Board({
                             <div
                               className="ticket-topline"
                               onBlur={(event) => {
-                                if (
-                                  !event.currentTarget.contains(event.relatedTarget as Node | null)
-                                ) {
+                                if (isOutside(event.currentTarget, event.relatedTarget)) {
                                   setOpenTicketMenuId(null)
                                 }
                               }}
                             >
-                              <span className="ticket-id">{ticket.id}</span>
+                              <span className="ticket-id" title={ticket.id}>
+                                {ticket.id.slice(0, 8)}
+                              </span>
                               <button
                                 className="icon-button ticket-menu"
                                 onClick={() =>
@@ -766,7 +804,7 @@ function Board({
                                 title="Ticketaktionen"
                                 type="button"
                               >
-                                ···
+                                <Ellipsis aria-hidden="true" size={16} />
                               </button>
                               {openTicketMenuId === ticket.id && (
                                 <div className="ticket-context-menu" role="menu">
@@ -775,7 +813,7 @@ function Board({
                                     onClick={() => openTicketEditor(ticket)}
                                     type="button"
                                   >
-                                    <span aria-hidden="true">✎</span> Bearbeiten
+                                    <Pencil aria-hidden="true" size={14} /> Bearbeiten
                                   </button>
                                   <button
                                     className="delete-ticket-action"
@@ -783,7 +821,7 @@ function Board({
                                     onClick={() => void deleteTicket(ticket.id)}
                                     type="button"
                                   >
-                                    <span aria-hidden="true">⌫</span> Löschen
+                                    <Trash2 aria-hidden="true" size={14} /> Löschen
                                   </button>
                                 </div>
                               )}
@@ -801,13 +839,13 @@ function Board({
                               <span
                                 className={`priority priority-${ticket.priority.toLowerCase()}`}
                               >
-                                <span>
-                                  {ticket.priority === 'Hoch'
-                                    ? '↑'
-                                    : ticket.priority === 'Niedrig'
-                                      ? '↓'
-                                      : '→'}
-                                </span>
+                                {ticket.priority === 'Hoch' ? (
+                                  <ChevronsUp aria-hidden="true" size={12} />
+                                ) : ticket.priority === 'Niedrig' ? (
+                                  <ChevronsDown aria-hidden="true" size={12} />
+                                ) : (
+                                  <Equal aria-hidden="true" size={12} />
+                                )}
                                 {ticket.priority}
                               </span>
                             </div>
@@ -822,9 +860,10 @@ function Board({
                                 <span className="sr-only">Status ändern</span>
                                 <select
                                   value={ticket.status}
-                                  onChange={(event) =>
-                                    void moveTicket(ticket.id, event.target.value as TicketStatus)
-                                  }
+                                  onChange={(event) => {
+                                    const status = event.target.value
+                                    if (isTicketStatus(status)) void moveTicket(ticket.id, status)
+                                  }}
                                   aria-label={`Status von ${ticket.title} ändern`}
                                 >
                                   {columns.map((status) => (
@@ -842,8 +881,12 @@ function Board({
                             {search ? 'Keine passenden Tickets.' : 'Noch keine Tickets'}
                           </div>
                         )}
-                        <button className="add-ticket-inline" onClick={openTicketCreator}>
-                          <span>+</span> Ticket hinzufügen
+                        <button
+                          className="add-ticket-inline"
+                          onClick={openTicketCreator}
+                          type="button"
+                        >
+                          <Plus aria-hidden="true" size={14} /> Ticket hinzufügen
                         </button>
                       </div>
                     </section>
@@ -1028,7 +1071,10 @@ function Board({
                   <span>Priorität</span>
                   <select
                     value={ticketPriority}
-                    onChange={(event) => setTicketPriority(event.target.value as TicketPriority)}
+                    onChange={(event) => {
+                      const priority = event.target.value
+                      if (isTicketPriority(priority)) setTicketPriority(priority)
+                    }}
                   >
                     <option>Niedrig</option>
                     <option>Mittel</option>
@@ -1040,7 +1086,10 @@ function Board({
                 <span>Status</span>
                 <select
                   value={ticketStatus}
-                  onChange={(event) => setTicketStatus(event.target.value as TicketStatus)}
+                  onChange={(event) => {
+                    const status = event.target.value
+                    if (isTicketStatus(status)) setTicketStatus(status)
+                  }}
                 >
                   {columns.map((column) => (
                     <option key={column.id} value={column.id}>

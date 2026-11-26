@@ -119,7 +119,8 @@ function PageEditor({
       aria-label="Dokumentation bearbeiten"
       className="page-editor"
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+        const target = event.relatedTarget
+        if (!(target instanceof Node && event.currentTarget.contains(target))) {
           void save()
         }
       }}
